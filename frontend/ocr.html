@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>持仓组合识别 - TaiheLabs</title>
+    <link rel="stylesheet" href="/static/styles.css">
+    <link rel="stylesheet" href="/static/auth.css">
+    <style>
+        .ocr-container {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 50px 40px;
+            border-radius: 16px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 800px;
+            position: relative;
+            z-index: 1;
+            backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
+        }
+        
+        .upload-section {
+            text-align: center;
+            padding: 40px 20px;
+            border: 2px dashed var(--border-color);
+            border-radius: 12px;
+            margin-bottom: 30px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .upload-section:hover {
+            border-color: var(--primary-color);
+            background-color: rgba(102, 126, 234, 0.05);
+        }
+        
+        .upload-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+            color: var(--text-light);
+        }
+        
+        .upload-text {
+            font-size: 16px;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+        }
+        
+        .upload-hint {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+        
+        #uploadedImage {
+            max-width: 100%;
+            max-height: 400px;
+            border-radius: 8px;
+            display: none;
+            margin: 20px auto;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+        
+        .results-section {
+            margin-top: 30px;
+            display: none;
+        }
+        
+        .results-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            color: var(--text-primary);
+        }
+        
+        .results-content {
+            background: var(--background-light);
+            padding: 20px;
+            border-radius: 8px;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            white-space: pre-wrap;
+            word-break: break-word;
+            line-height: 1.5;
+        }
+        
+        .result-card {
+            background: var(--background-light);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 12px;
+            transition: all 0.2s ease;
+        }
+        
+        .result-card:hover {
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+            transform: translateY(-1px);
+        }
+        
+        .result-text {
+            font-size: 14px;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+        }
+        
+        .result-confidence {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+        
+        .confidence-high {
+            color: var(--success-color);
+        }
+        
+        .confidence-medium {
+            color: var(--warning-color);
+        }
+        
+        .confidence-low {
+            color: var(--danger-color);
+        }
+        
+        .loading-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.9);
+            z-index: 9999;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+        }
+        
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--border-color);
+            border-top: 3px solid var(--primary-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 16px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .loading-text {
+            font-size: 16px;
+            color: var(--text-secondary);
+        }
+        
+        .tab-container {
+            display: flex;
+            border-bottom: 2px solid var(--border-color);
+            margin-bottom: 20px;
+        }
+        
+        .tab {
+            padding: 12px 24px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            transition: all 0.2s ease;
+            position: relative;
+        }
+        
+        .tab.active {
+            color: var(--primary-color);
+        }
+        
+        .tab.active::after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background: var(--primary-color);
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="ocr-container">
+        <div class="logo">
+            <h1>TaiheLabs</h1>
+        </div>
+        
+        <h2>持仓组合识别</h2>
+        
+        <div id="errorMessage" class="error-message"></div>
+        <div id="successMessage" class="success-message"></div>
+        
+        <!-- 图片上传区域 -->
+        <div class="upload-section" id="uploadSection">
+            <div class="upload-icon">📁</div>
+            <div class="upload-text">点击或拖拽图片到此处上传</div>
+            <div class="upload-hint">支持JPG、PNG等常见图片格式</div>
+            <input type="file" id="imageUpload" accept="image/*" style="display: none;">
+        </div>
+        
+        <!-- 已上传图片预览 -->
+        <img id="uploadedImage" alt="已上传的图片">
+        
+        <!-- 识别结果区域 -->
+        <div class="results-section" id="resultsSection">
+            <div class="tab-container">
+                <div class="tab active" data-tab="raw">原始识别结果</div>
+                <div class="tab" data-tab="structured">结构化数据</div>
+            </div>
+            
+            <div class="tab-content active" id="rawContent">
+                <div id="rawResults" class="results-content"></div>
+            </div>
+            
+            <div class="tab-content" id="structuredContent">
+                <div id="structuredResults" class="results-content"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 加载中遮罩 -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">正在识别图片内容，请稍候...</div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const uploadSection = document.getElementById('uploadSection');
+            const imageUpload = document.getElementById('imageUpload');
+            const uploadedImage = document.getElementById('uploadedImage');
+            const resultsSection = document.getElementById('resultsSection');
+            const rawResults = document.getElementById('rawResults');
+            const structuredResults = document.getElementById('structuredResults');
+            const loadingOverlay = document.getElementById('loadingOverlay');
+            const errorMessage = document.getElementById('errorMessage');
+            const successMessage = document.getElementById('successMessage');
+            const tabs = document.querySelectorAll('.tab');
+            const tabContents = document.querySelectorAll('.tab-content');
+            
+            // 上传区域点击事件
+            uploadSection.addEventListener('click', function() {
+                imageUpload.click();
+            });
+            
+            // 拖拽上传
+            uploadSection.addEventListener('dragover', function(e) {
+                e.preventDefault();
+                this.style.backgroundColor = 'rgba(102, 126, 234, 0.1)';
+            });
+            
+            uploadSection.addEventListener('dragleave', function() {
+                this.style.backgroundColor = '';
+            });
+            
+            uploadSection.addEventListener('drop', function(e) {
+                e.preventDefault();
+                this.style.backgroundColor = '';
+                
+                if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                    handleFileUpload(e.dataTransfer.files[0]);
+                }
+            });
+            
+            // 文件选择事件
+            imageUpload.addEventListener('change', function() {
+                if (this.files && this.files[0]) {
+                    handleFileUpload(this.files[0]);
+                }
+            });
+            
+            // 处理文件上传
+            function handleFileUpload(file) {
+                // 显示上传的图片预览
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    uploadedImage.src = e.target.result;
+                    uploadedImage.style.display = 'block';
+                };
+                reader.readAsDataURL(file);
+                
+                // 调用OCR识别API
+                recognizePortfolio(file);
+            }
+            
+            // 调用OCR识别API
+            function recognizePortfolio(file) {
+                // 显示加载中
+                loadingOverlay.style.display = 'flex';
+                errorMessage.style.display = 'none';
+                
+                // 创建FormData对象
+                const formData = new FormData();
+                formData.append('file', file);
+                
+                // 发送请求
+                fetch('/api/ocr/recognize-portfolio', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('识别失败，请重试');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    // 隐藏加载中
+                    loadingOverlay.style.display = 'none';
+                    
+                    // 显示识别结果
+                    displayRecognitionResults(data);
+                    
+                    // 显示成功消息
+                    successMessage.textContent = '识别成功';
+                    successMessage.style.display = 'block';
+                    setTimeout(() => {
+                        successMessage.style.display = 'none';
+                    }, 3000);
+                })
+                .catch(error => {
+                    // 隐藏加载中
+                    loadingOverlay.style.display = 'none';
+                    
+                    // 显示错误消息
+                    errorMessage.textContent = error.message;
+                    errorMessage.style.display = 'block';
+                });
+            }
+            
+            // 显示识别结果
+            function displayRecognitionResults(data) {
+                // 显示结果区域
+                resultsSection.style.display = 'block';
+                
+                // 显示原始识别结果
+                if (data.raw_texts && data.raw_texts.length > 0) {
+                    let rawHtml = '';
+                    data.raw_texts.forEach((item, index) => {
+                        let confidenceClass = 'confidence-medium';
+                        if (item.confidence > 0.8) {
+                            confidenceClass = 'confidence-high';
+                        } else if (item.confidence < 0.5) {
+                            confidenceClass = 'confidence-low';
+                        }
+                        
+                        rawHtml += `
+                            <div class="result-card">
+                                <div class="result-text">${item.text}</div>
+                                <div class="result-confidence ${confidenceClass}">置信度: ${(item.confidence * 100).toFixed(1)}%</div>
+                            </div>
+                        `;
+                    });
+                    rawResults.innerHTML = rawHtml;
+                } else {
+                    rawResults.textContent = '未识别到文本内容';
+                }
+                
+                // 显示结构化数据
+                if (data.structured_data && data.structured_data.length > 0) {
+                    let structuredHtml = '<table style="width:100%; border-collapse:collapse;">';
+                    structuredHtml += '<thead><tr style="border-bottom:2px solid var(--border-color);"><th style="padding:8px;text-align:left;">行号</th><th style="padding:8px;text-align:left;">内容</th></tr></thead>';
+                    structuredHtml += '<tbody>';
+                    
+                    data.structured_data.forEach(item => {
+                        structuredHtml += `
+                            <tr style="border-bottom:1px solid var(--border-color);">
+                                <td style="padding:8px;">${item.line_number}</td>
+                                <td style="padding:8px;">${item.content}</td>
+                            </tr>
+                        `;
+                    });
+                    
+                    structuredHtml += '</tbody></table>';
+                    structuredResults.innerHTML = structuredHtml;
+                } else {
+                    structuredResults.textContent = '无法提取结构化数据';
+                }
+            }
+            
+            // 标签切换
+            tabs.forEach(tab => {
+                tab.addEventListener('click', function() {
+                    // 移除所有活动标签和内容的active类
+                    tabs.forEach(t => t.classList.remove('active'));
+                    tabContents.forEach(content => content.classList.remove('active'));
+                    
+                    // 添加当前标签和内容的active类
+                    this.classList.add('active');
+                    const tabId = this.getAttribute('data-tab');
+                    document.getElementById(`${tabId}Content`).classList.add('active');
+                });
+            });
+            
+            // 检查OCR服务健康状态
+            checkOcrHealth();
+        });
+        
+        // 检查OCR服务健康状态
+        function checkOcrHealth() {
+            fetch('/api/ocr/health')
+            .then(response => response.json())
+            .then(data => {
+                console.log('OCR服务健康状态:', data);
+            })
+            .catch(error => {
+                console.error('OCR服务健康检查失败:', error);
+                const errorMessage = document.getElementById('errorMessage');
+                errorMessage.textContent = 'OCR服务初始化中，请稍后再试';
+                errorMessage.style.display = 'block';
+            });
+        }
+    </script>
+</body>
+</html>

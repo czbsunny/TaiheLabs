@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>注册 - TaiheLabs</title>
+    <link rel="stylesheet" href="/static/styles.css">
+    <link rel="stylesheet" href="/static/auth.css">
+</head>
+<body>
+    <div class="register-container">
+        <div class="logo">
+            <h1>TaiheLabs</h1>
+        </div>
+        
+        <h2>创建新账户</h2>
+        
+        <div id="errorMessage" class="error-message"></div>
+        <div id="successMessage" class="success-message"></div>
+        
+        <form id="registerForm">
+            <div class="form-group">
+                <label for="username">用户名</label>
+                <div class="input-container">
+                    <span class="input-icon">👤</span>
+                    <input type="text" id="username" name="username" required placeholder="请输入用户名">
+                </div>
+                <div class="form-note">用户名只能包含字母、数字和下划线</div>
+            </div>
+            
+            <div class="form-group">
+                <label for="email">邮箱</label>
+                <div class="input-container">
+                    <span class="input-icon">📧</span>
+                    <input type="email" id="email" name="email" required placeholder="请输入邮箱地址">
+                </div>
+                <div class="form-note">用于账号安全验证</div>
+            </div>
+            
+            <div class="form-group">
+                <label for="password">密码</label>
+                <div class="input-container">
+                    <span class="input-icon">🔒</span>
+                    <input type="password" id="password" name="password" required placeholder="请设置密码">
+                </div>
+                <div class="form-note">密码至少包含8个字符</div>
+            </div>
+            
+            <div class="button-container">
+                <button type="submit">注册</button>
+            </div>
+        </form>
+        
+        <div class="form-footer">
+            <div class="login-link">
+                <p>已有账号？<a href="/">返回登录</a></p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const form = document.getElementById("registerForm");
+        const errorMessage = document.getElementById("errorMessage");
+        const successMessage = document.getElementById("successMessage");
+        
+        // 检查URL中是否有注册失败的标志
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('error')) {
+            showError(urlParams.get('error') || '注册失败，请重试');
+        }
+        
+        form.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            
+            // 清除之前的错误信息
+            hideMessages();
+            
+            // 获取表单数据
+            const data = new FormData(form);
+            const username = data.get('username');
+            const email = data.get('email');
+            const password = data.get('password');
+            
+            // 简单的客户端验证
+            if (!username.trim()) {
+                showError('请输入用户名');
+                return;
+            }
+            
+            if (!validateUsername(username)) {
+                showError('用户名只能包含字母、数字和下划线');
+                return;
+            }
+            
+            if (!email.trim()) {
+                showError('请输入邮箱');
+                return;
+            }
+            
+            if (!validateEmail(email)) {
+                showError('请输入有效的邮箱地址');
+                return;
+            }
+            
+            if (!password.trim()) {
+                showError('请设置密码');
+                return;
+            }
+            
+            if (password.length < 8) {
+                showError('密码长度至少为8个字符');
+                return;
+            }
+            
+            try {
+                // 提交注册请求
+                const res = await fetch("/api/auth/register", {
+                    method: "POST",
+                    body: data
+                });
+                
+                const json = await res.json();
+                
+                if (res.ok) {
+                    // 显示成功信息并跳转
+                    showSuccess('注册成功，正在跳转到登录页面...');
+                    setTimeout(() => {
+                        window.location.href = "/";
+                    }, 2000);
+                } else {
+                    // 显示错误信息
+                    showError(json.detail || '注册失败，请稍后重试');
+                }
+            } catch (error) {
+                showError('网络错误，请稍后重试');
+            }
+        });
+        
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorMessage.style.display = 'block';
+        }
+        
+        function showSuccess(message) {
+            successMessage.textContent = message;
+            successMessage.style.display = 'block';
+        }
+        
+        function hideMessages() {
+            errorMessage.style.display = 'none';
+            successMessage.style.display = 'none';
+        }
+        
+        // 简单的用户名验证
+        function validateUsername(username) {
+            const re = /^[a-zA-Z0-9_]+$/;
+            return re.test(username);
+        }
+        
+        // 简单的邮箱验证
+        function validateEmail(email) {
+            const re = /^[\w-]+(\.[\w-]+)*@[\w-]+(\.[\w-]+)+$/;
+            return re.test(email);
+        }
+        
+        // 为输入框添加焦点事件，清除错误提示
+        document.getElementById('username').addEventListener('focus', hideMessages);
+        document.getElementById('email').addEventListener('focus', hideMessages);
+        document.getElementById('password').addEventListener('focus', hideMessages);
+    </script>
+</body>
+</html>

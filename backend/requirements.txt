@@ -1,0 +1,40 @@
+# 使用清华源加速安装 (特别是easyocr)
+# pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+
+# 后端Web框架
+Flask==2.0.3
+fastapi==0.95.0
+uvicorn==0.22.0
+
+# 数据库相关
+SQLAlchemy==1.4.46
+pymysql==1.0.3
+
+# API文档
+Flask-RESTful==0.3.9
+
+# 数据处理
+pandas==2.3.2
+numpy==2.0.2
+
+# 安全相关
+python-dotenv==1.0.1
+PyJWT==2.4.0
+bcrypt==3.2.2
+
+# 其他工具
+requests==2.31.0
+
+# 数据库迁移
+Flask-Migrate==3.1.0
+Flask-Script==2.0.6
+
+# CORS支持
+Flask-Cors==3.0.10
+
+# 日志
+python-json-logger==2.0.4
+
+# OCR识别
+easyocr==1.7.1
+opencv-python==4.10.0.84

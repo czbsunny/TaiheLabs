@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>投资组合管理中心</title>
+    <link rel="stylesheet" href="/static/styles.css">
+    <link rel="stylesheet" href="/static/dashboard.css">
+</head>
+<body>
+    <div class="container">
+        <div class="dashboard-header">
+            <div class="header-content">
+                <div>
+                    <h1>投资组合管理中心</h1>
+                    <div class="dashboard-subtitle">管理您的投资组合、追踪持仓表现并优化资产配置</div>
+                </div>
+                <!-- 个人中心 -->
+                <div class="user-menu">
+                    <button id="userMenuButton" class="user-menu-button">
+                        <span class="user-icon">👤</span>
+                        <span class="user-name">用户</span>
+                        <span class="dropdown-arrow">▼</span>
+                    </button>
+                    <div id="userDropdown" class="user-dropdown">
+                        <a href="#" class="dropdown-item" onclick="showUserProfile()">个人资料</a>
+                        <a href="#" class="dropdown-item logout-item" onclick="confirmLogout()">退出登录</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 创建组合表单 -->
+        <div class="create-form">
+            <h3>创建新组合</h3>
+            <form action="/api/portfolio/create" method="post">
+                <input type="hidden" name="user_id" value="{{ user_id }}">
+                <input type="text" name="name" placeholder="组合名称" required>
+                <input type="text" name="description" placeholder="组合描述（可选）">
+                <button type="submit">创建组合</button>
+            </form>
+            <div class="ocr-link-container">
+                <p>或者：</p>
+                <div class="image-upload-container">
+                    <label for="dashboardImageUpload" class="ocr-link-button">
+                        <span class="ocr-icon">📸</span>
+                        上传图片识别持仓组合
+                    </label>
+                    <input type="file" id="dashboardImageUpload" accept="image/*" style="display: none;">
+                </div>
+                
+                <!-- 已上传图片预览 -->
+                <img id="dashboardUploadedImage" alt="已上传的图片" style="max-width: 100%; max-height: 300px; border-radius: 8px; margin: 10px 0; display: none;">
+                
+                <!-- OCR结果显示区域 -->
+                <div id="ocrResultsContainer" style="margin-top: 20px; display: none;">
+                    <h4>识别结果</h4>
+                    <div id="ocrResultsContent" style="background: var(--background-light); padding: 15px; border-radius: 8px; max-height: 300px; overflow-y: auto;"></div>
+                    <button id="confirmOCRButton" class="confirm-button" style="margin-top: 10px; padding: 8px 16px; background: var(--primary-color); color: white; border: none; border-radius: 4px; cursor: pointer;">确认导入</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 投资组合标签页 -->
+        <div class="tabs">
+            {% for p in portfolios %}
+            <div class="tab-wrapper">
+                <button class="tab" onclick="openTab(event, 'portfolio-{{ p.id }}')">
+                    {{ p.name }}{% if p.description %}<span class="tab-desc">({{ p.description }})</span>{% endif %}
+                </button>
+                <button type="button" class="tab-close" onclick="confirmDeletePortfolioByTab(event, '{{ user_id|e }}', '{{ p.id|e }}')">&times;</button>
+            </div>
+            {% else %}
+            <div class="empty-state">
+                <div class="empty-state-icon">📊</div>
+                <h3>暂无投资组合</h3>
+                <p>点击上方的表单创建您的第一个投资组合</p>
+            </div>
+            {% endfor %}
+        </div>
+        
+        <!-- 每个组合的内容 -->
+        {% for p in portfolios %}
+        <div id="portfolio-{{ p.id }}" class="tab-content">
+            <div class="portfolio-info">
+                <div class="portfolio-stats">
+                    <div class="stat-item">
+                        <div class="stat-value">{{ p.items|length }}</div>
+                        <div class="stat-label">持仓数量</div>
+                    </div>
+                    {% set total_cost = p.items|sum(attribute='quantity') * p.items|sum(attribute='cost') / p.items|length if p.items else 0 %}
+                    <div class="stat-item">
+                        <div class="stat-value">¥{{ "%.2f"|format(total_cost) }}</div>
+                        <div class="stat-label">总成本</div>
+                    </div>
+                </div>
+            </div>
+            
+
+            
+            <!-- 添加持仓表单 -->
+            <div class="portfolio-items">
+                <div class="add-item-form">
+                    <h4>添加持仓</h4>
+                    <form action="/api/portfolio/{{ p.id }}/items/add" method="post">
+                        <div class="form-group">
+                            <input type="text" name="symbol" placeholder="基金/股票代码" required>
+                            <input type="number" name="quantity" placeholder="持有数量" step="0.01" required>
+                            <input type="number" name="cost" placeholder="单位成本" step="0.01" required>
+                            <button type="submit">添加</button>
+                        </div>
+                    </form>
+                </div>
+                
+                <!-- 持仓明细表格 -->
+                <h4>持仓明细</h4>
+                {% if p.items %}
+                <table>
+                    <thead>
+                        <tr>
+                            <th>代码</th>
+                            <th>数量</th>
+                            <th>单位成本</th>
+                            <th>总成本</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in p.items %}
+                        <tr>
+                            <td>{{ item.symbol }}</td>
+                            <td>{{ item.quantity }}</td>
+                            <td>¥{{ "%.2f"|format(item.cost) }}</td>
+                            <td>¥{{ "%.2f"|format(item.quantity * item.cost) }}</td>
+                            <td>
+                                <form style="display:inline" action="/api/portfolio/{{ p.id }}/items/delete" method="post">
+                                    <input type="hidden" name="item_id" value="{{ item.id }}">
+                                    <button type="button" class="delete-btn" onclick="confirmDeleteItem(this.form)">删除</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <div class="empty-state">
+                    <div class="empty-state-icon">📈</div>
+                    <h3>暂无持仓</h3>
+                    <p>使用上方表单添加您的第一支股票或基金</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    
+    <script>
+        // 标签页切换功能
+        function openTab(evt, tabName) {
+            // 隐藏所有标签内容
+            var tabContent = document.getElementsByClassName("tab-content");
+            for (var i = 0; i < tabContent.length; i++) {
+                tabContent[i].classList.remove("active");
+            }
+            
+            // 移除所有标签的active类
+            var tabs = document.getElementsByClassName("tab");
+            for (var i = 0; i < tabs.length; i++) {
+                tabs[i].classList.remove("active");
+            }
+            
+            // 显示当前标签内容并设置当前标签为active
+            document.getElementById(tabName).classList.add("active");
+            evt.currentTarget.classList.add("active");
+        }
+        
+        // 删除组合确认函数
+        function confirmDeletePortfolio(form) {
+            if (confirm('确定要删除该组合吗？这将同时删除所有持仓明细。')) {
+                console.log('确认删除组合，提交表单:', form.action);
+                form.submit();
+            } else {
+                console.log('取消删除组合');
+            }
+        }
+        
+        // 通过标签页关闭按钮删除组合
+        function confirmDeletePortfolioByTab(event, userId, portfolioId) {
+            event.stopPropagation(); // 阻止事件冒泡，防止触发标签页点击
+            if (confirm('确定要删除该组合吗？这将同时删除所有持仓明细。')) {
+                console.log('确认删除组合，用户ID:', userId, '组合ID:', portfolioId);
+                // 创建表单并提交
+                var form = document.createElement('form');
+                form.method = 'post';
+                form.action = '/api/portfolio/delete';
+                
+                var userIdInput = document.createElement('input');
+                userIdInput.type = 'hidden';
+                userIdInput.name = 'user_id';
+                userIdInput.value = userId;
+                form.appendChild(userIdInput);
+                
+                var portfolioIdInput = document.createElement('input');
+                portfolioIdInput.type = 'hidden';
+                portfolioIdInput.name = 'portfolio_id';
+                portfolioIdInput.value = portfolioId;
+                form.appendChild(portfolioIdInput);
+                
+                document.body.appendChild(form);
+                form.submit();
+            }
+        }
+        
+        // 删除持仓确认函数
+        function confirmDeleteItem(form) {
+            if (confirm('确定要删除该持仓吗？')) {
+                console.log('确认删除持仓，提交表单:', form.action);
+                form.submit();
+            } else {
+                console.log('取消删除持仓');
+            }
+        }
+        
+        // 默认打开第一个标签
+        document.addEventListener("DOMContentLoaded", function() {
+            var firstTab = document.querySelector(".tab");
+            if (firstTab) {
+                firstTab.click();
+            }
+            
+            // 添加调试代码检查删除按钮和表单
+            console.log("DOM 加载完成，开始检查删除功能");
+            
+            // 检查删除组合按钮
+            var deletePortfolioBtns = document.querySelectorAll(".delete-portfolio");
+            console.log("找到", deletePortfolioBtns.length, "个删除组合按钮");
+            
+            // 检查删除持仓按钮
+            var deleteItemBtns = document.querySelectorAll(".delete-btn");
+            console.log("找到", deleteItemBtns.length, "个删除持仓按钮");
+            
+            // 初始化个人中心菜单
+            initUserMenu();
+        });
+        
+        // 初始化个人中心菜单
+        function initUserMenu() {
+            const userMenuButton = document.getElementById('userMenuButton');
+            const userDropdown = document.getElementById('userDropdown');
+            
+            if (userMenuButton && userDropdown) {
+                // 点击用户菜单按钮切换下拉菜单显示状态
+                userMenuButton.addEventListener('click', function() {
+                    userDropdown.classList.toggle('show');
+                    userMenuButton.classList.toggle('active');
+                });
+                
+                // 点击页面其他地方关闭下拉菜单
+                document.addEventListener('click', function(event) {
+                    if (!userMenuButton.contains(event.target) && !userDropdown.contains(event.target)) {
+                        userDropdown.classList.remove('show');
+                        userMenuButton.classList.remove('active');
+                    }
+                });
+                
+                // 防止点击下拉菜单内的项目关闭菜单
+                userDropdown.addEventListener('click', function(event) {
+                    event.stopPropagation();
+                });
+            }
+        }
+        
+        // 显示个人资料（模拟功能）
+        function showUserProfile() {
+            alert('个人资料功能将在后续版本中实现');
+        }
+        
+        // OCR图片上传和识别功能
+        document.addEventListener('DOMContentLoaded', function() {
+            const dashboardImageUpload = document.getElementById('dashboardImageUpload');
+            const dashboardUploadedImage = document.getElementById('dashboardUploadedImage');
+            const ocrResultsContainer = document.getElementById('ocrResultsContainer');
+            const ocrResultsContent = document.getElementById('ocrResultsContent');
+            const confirmOCRButton = document.getElementById('confirmOCRButton');
+            let ocrData = null; // 存储OCR识别结果
+            
+            // 文件选择事件
+            if (dashboardImageUpload) {
+                dashboardImageUpload.addEventListener('change', function() {
+                    if (this.files && this.files[0]) {
+                        handleFileUpload(this.files[0]);
+                    }
+                });
+            }
+            
+            // 确认导入按钮点击事件
+            if (confirmOCRButton) {
+                confirmOCRButton.addEventListener('click', function() {
+                    if (ocrData && ocrData.structured_data && ocrData.structured_data.length > 0) {
+                        // 这里可以添加导入到投资组合的逻辑
+                        // 目前只是显示一个提示
+                        alert('识别结果已准备好导入，此功能将在后续版本中实现');
+                        
+                        // 重置OCR相关元素
+                        resetOCRComponents();
+                    } else {
+                        alert('没有可导入的识别结果');
+                    }
+                });
+            }
+            
+            // 处理文件上传
+            function handleFileUpload(file) {
+                // 显示上传的图片预览
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    dashboardUploadedImage.src = e.target.result;
+                    dashboardUploadedImage.style.display = 'block';
+                };
+                reader.readAsDataURL(file);
+                
+                // 调用OCR识别API
+                recognizePortfolio(file);
+            }
+            
+            // 调用OCR识别API
+            function recognizePortfolio(file) {
+                // 显示加载状态
+                ocrResultsContent.innerHTML = '<div style="text-align: center; padding: 20px;">正在识别图片内容，请稍候...</div>';
+                ocrResultsContainer.style.display = 'block';
+                
+                // 创建FormData对象
+                const formData = new FormData();
+                formData.append('file', file);
+                
+                // 发送请求
+                fetch('/api/ocr/recognize-portfolio', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        // 检查响应是否为JSON格式
+                        return response.text().then(text => {
+                            try {
+                                // 尝试解析文本为JSON
+                                const errorData = JSON.parse(text);
+                                throw new Error(errorData.error || '识别失败，请重试');
+                            } catch (jsonError) {
+                                // 如果不是有效的JSON，抛出原始错误
+                                throw new Error('服务器返回非预期响应，请稍后重试');
+                            }
+                        });
+                    }
+                    // 安全地尝试解析JSON
+                    return response.text().then(text => {
+                        try {
+                            return JSON.parse(text);
+                        } catch (e) {
+                            throw new Error('识别结果解析失败，请重试');
+                        }
+                    });
+                })
+                .then(data => {
+                    // 存储识别结果
+                    ocrData = data;
+                    
+                    // 显示识别结果
+                    displayRecognitionResults(data);
+                })
+                .catch(error => {
+                    // 显示友好的错误消息
+                    ocrResultsContent.innerHTML = `<div style="color: var(--danger-color); padding: 20px;">识别失败：${error.message}</div>`;
+                });
+            }
+            
+            // 显示识别结果
+            function displayRecognitionResults(data) {
+                if (data.structured_data && data.structured_data.length > 0) {
+                    // 创建表格显示结构化数据
+                    let tableHtml = '<table style="width:100%; border-collapse:collapse;">';
+                    
+                    // 检查数据结构，确定是否包含详细的基金字段
+                    const hasDetailedFields = data.structured_data.some(item => 
+                        item.fund_name || item.hold_amount || item.cumulative_profit
+                    );
+                    
+                    if (hasDetailedFields) {
+                        // 如果有详细的基金字段，显示完整的基金信息表格
+                        tableHtml += '<thead><tr style="border-bottom:2px solid var(--border-color);">';
+                        tableHtml += '<th style="padding:8px;text-align:left;">基金代码</th>';
+                        tableHtml += '<th style="padding:8px;text-align:left;">基金名称</th>';
+                        tableHtml += '<th style="padding:8px;text-align:left;">持仓金额</th>';
+                        tableHtml += '<th style="padding:8px;text-align:left;">持有收益</th>';
+                        tableHtml += '</tr></thead>';
+                        
+                        tableHtml += '<tbody>';
+                        
+                        data.structured_data.forEach(item => {
+                            // 只显示有价值的基金数据行
+                            if (item.fund_name || item.hold_amount) {
+                                tableHtml += `
+                                    <tr style="border-bottom:1px solid var(--border-color);">
+                                        <td style="padding:8px;">${item.fund_code || '-'}</td>
+                                        <td style="padding:8px;">${item.fund_name || item.original_text}</td>
+                                        <td style="padding:8px;">${item.hold_amount || '-'}</td>
+                                        <td style="padding:8px;">${item.hold_profit || '-'}</td>
+                                    </tr>
+                                `;
+                            }
+                        });
+                    } else {
+                        // 否则显示简单的行号和内容表格
+                        tableHtml += '<thead><tr style="border-bottom:2px solid var(--border-color);"><th style="padding:8px;text-align:left;">行号</th><th style="padding:8px;text-align:left;">内容</th></tr></thead>';
+                        tableHtml += '<tbody>';
+                        
+                        data.structured_data.forEach((item, index) => {
+                            tableHtml += `
+                                <tr style="border-bottom:1px solid var(--border-color);">
+                                    <td style="padding:8px;">${item.line_number || (index + 1)}</td>
+                                    <td style="padding:8px;">${item.content || item.original_text || item.text}</td>
+                                </tr>
+                            `;
+                        });
+                    }
+                    
+                    tableHtml += '</tbody></table>';
+                    ocrResultsContent.innerHTML = tableHtml;
+                } else {
+                    ocrResultsContent.innerHTML = '<div style="padding: 20px; text-align: center;">无法识别出有效的持仓信息</div>';
+                }
+            }
+            
+            // 重置OCR相关元素
+            function resetOCRComponents() {
+                dashboardImageUpload.value = '';
+                dashboardUploadedImage.style.display = 'none';
+                ocrResultsContainer.style.display = 'none';
+                ocrResultsContent.innerHTML = '';
+                ocrData = null;
+            }
+        });
+        
+        // 确认退出登录
+        function confirmLogout() {
+            if (confirm('确定要退出登录吗？')) {
+                // 创建退出登录表单并提交
+                const form = document.createElement('form');
+                form.method = 'post';
+                form.action = '/api/auth/logout';
+                
+                document.body.appendChild(form);
+                form.submit();
+            }
+        }
+    </script>
+</body>
+</html>
