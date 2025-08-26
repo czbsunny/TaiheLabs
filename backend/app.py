@@ -12,10 +12,11 @@ app = FastAPI(title="TaiheLabs API")
 app.mount("/static", StaticFiles(directory="../frontend"), name="static")
 
 # 导入 API 路由
-from api import auth, portfolio
+from api import auth, portfolio, ocr
 
 app.include_router(auth.auth_router, prefix="/api/auth", tags=["auth"])
 app.include_router(portfolio.portfolio_router, prefix="/api/portfolio", tags=["portfolio"])
+app.include_router(ocr.ocr_router, prefix="/api/ocr", tags=["ocr"])
 # app.include_router(user.router, prefix="/api/user", tags=["user"])
 
 # 默认首页，返回登录页面

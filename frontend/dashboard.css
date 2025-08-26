@@ -201,6 +201,46 @@ h1 {
     box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
 }
 
+/* OCR链接样式 */
+.ocr-link-container {
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border-color);
+    text-align: center;
+}
+
+.ocr-link-container p {
+    margin-bottom: 12px;
+    color: var(--text-secondary);
+    font-size: 14px;
+}
+
+.ocr-link-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    background: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.ocr-link-button:hover {
+    background: var(--primary-hover);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.ocr-link-button:active {
+    transform: translateY(0);
+}
+
 /* 标签页样式 */
 .tabs {
     display: flex;

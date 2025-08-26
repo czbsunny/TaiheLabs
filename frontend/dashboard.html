@@ -37,6 +37,26 @@
                 <input type="text" name="description" placeholder="组合描述（可选）">
                 <button type="submit">创建组合</button>
             </form>
+            <div class="ocr-link-container">
+                <p>或者：</p>
+                <div class="image-upload-container">
+                    <label for="dashboardImageUpload" class="ocr-link-button">
+                        <span class="ocr-icon">📸</span>
+                        上传图片识别持仓组合
+                    </label>
+                    <input type="file" id="dashboardImageUpload" accept="image/*" style="display: none;">
+                </div>
+                
+                <!-- 已上传图片预览 -->
+                <img id="dashboardUploadedImage" alt="已上传的图片" style="max-width: 100%; max-height: 300px; border-radius: 8px; margin: 10px 0; display: none;">
+                
+                <!-- OCR结果显示区域 -->
+                <div id="ocrResultsContainer" style="margin-top: 20px; display: none;">
+                    <h4>识别结果</h4>
+                    <div id="ocrResultsContent" style="background: var(--background-light); padding: 15px; border-radius: 8px; max-height: 300px; overflow-y: auto;"></div>
+                    <button id="confirmOCRButton" class="confirm-button" style="margin-top: 10px; padding: 8px 16px; background: var(--primary-color); color: white; border: none; border-radius: 4px; cursor: pointer;">确认导入</button>
+                </div>
+            </div>
         </div>
         
         <!-- 投资组合标签页 -->
@@ -252,6 +272,172 @@
         function showUserProfile() {
             alert('个人资料功能将在后续版本中实现');
         }
+        
+        // OCR图片上传和识别功能
+        document.addEventListener('DOMContentLoaded', function() {
+            const dashboardImageUpload = document.getElementById('dashboardImageUpload');
+            const dashboardUploadedImage = document.getElementById('dashboardUploadedImage');
+            const ocrResultsContainer = document.getElementById('ocrResultsContainer');
+            const ocrResultsContent = document.getElementById('ocrResultsContent');
+            const confirmOCRButton = document.getElementById('confirmOCRButton');
+            let ocrData = null; // 存储OCR识别结果
+            
+            // 文件选择事件
+            if (dashboardImageUpload) {
+                dashboardImageUpload.addEventListener('change', function() {
+                    if (this.files && this.files[0]) {
+                        handleFileUpload(this.files[0]);
+                    }
+                });
+            }
+            
+            // 确认导入按钮点击事件
+            if (confirmOCRButton) {
+                confirmOCRButton.addEventListener('click', function() {
+                    if (ocrData && ocrData.structured_data && ocrData.structured_data.length > 0) {
+                        // 这里可以添加导入到投资组合的逻辑
+                        // 目前只是显示一个提示
+                        alert('识别结果已准备好导入，此功能将在后续版本中实现');
+                        
+                        // 重置OCR相关元素
+                        resetOCRComponents();
+                    } else {
+                        alert('没有可导入的识别结果');
+                    }
+                });
+            }
+            
+            // 处理文件上传
+            function handleFileUpload(file) {
+                // 显示上传的图片预览
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    dashboardUploadedImage.src = e.target.result;
+                    dashboardUploadedImage.style.display = 'block';
+                };
+                reader.readAsDataURL(file);
+                
+                // 调用OCR识别API
+                recognizePortfolio(file);
+            }
+            
+            // 调用OCR识别API
+            function recognizePortfolio(file) {
+                // 显示加载状态
+                ocrResultsContent.innerHTML = '<div style="text-align: center; padding: 20px;">正在识别图片内容，请稍候...</div>';
+                ocrResultsContainer.style.display = 'block';
+                
+                // 创建FormData对象
+                const formData = new FormData();
+                formData.append('file', file);
+                
+                // 发送请求
+                fetch('/api/ocr/recognize-portfolio', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        // 检查响应是否为JSON格式
+                        return response.text().then(text => {
+                            try {
+                                // 尝试解析文本为JSON
+                                const errorData = JSON.parse(text);
+                                throw new Error(errorData.error || '识别失败，请重试');
+                            } catch (jsonError) {
+                                // 如果不是有效的JSON，抛出原始错误
+                                throw new Error('服务器返回非预期响应，请稍后重试');
+                            }
+                        });
+                    }
+                    // 安全地尝试解析JSON
+                    return response.text().then(text => {
+                        try {
+                            return JSON.parse(text);
+                        } catch (e) {
+                            throw new Error('识别结果解析失败，请重试');
+                        }
+                    });
+                })
+                .then(data => {
+                    // 存储识别结果
+                    ocrData = data;
+                    
+                    // 显示识别结果
+                    displayRecognitionResults(data);
+                })
+                .catch(error => {
+                    // 显示友好的错误消息
+                    ocrResultsContent.innerHTML = `<div style="color: var(--danger-color); padding: 20px;">识别失败：${error.message}</div>`;
+                });
+            }
+            
+            // 显示识别结果
+            function displayRecognitionResults(data) {
+                if (data.structured_data && data.structured_data.length > 0) {
+                    // 创建表格显示结构化数据
+                    let tableHtml = '<table style="width:100%; border-collapse:collapse;">';
+                    
+                    // 检查数据结构，确定是否包含详细的基金字段
+                    const hasDetailedFields = data.structured_data.some(item => 
+                        item.fund_name || item.hold_amount || item.cumulative_profit
+                    );
+                    
+                    if (hasDetailedFields) {
+                        // 如果有详细的基金字段，显示完整的基金信息表格
+                        tableHtml += '<thead><tr style="border-bottom:2px solid var(--border-color);">';
+                        tableHtml += '<th style="padding:8px;text-align:left;">基金代码</th>';
+                        tableHtml += '<th style="padding:8px;text-align:left;">基金名称</th>';
+                        tableHtml += '<th style="padding:8px;text-align:left;">持仓金额</th>';
+                        tableHtml += '<th style="padding:8px;text-align:left;">持有收益</th>';
+                        tableHtml += '</tr></thead>';
+                        
+                        tableHtml += '<tbody>';
+                        
+                        data.structured_data.forEach(item => {
+                            // 只显示有价值的基金数据行
+                            if (item.fund_name || item.hold_amount) {
+                                tableHtml += `
+                                    <tr style="border-bottom:1px solid var(--border-color);">
+                                        <td style="padding:8px;">${item.fund_code || '-'}</td>
+                                        <td style="padding:8px;">${item.fund_name || item.original_text}</td>
+                                        <td style="padding:8px;">${item.hold_amount || '-'}</td>
+                                        <td style="padding:8px;">${item.hold_profit || '-'}</td>
+                                    </tr>
+                                `;
+                            }
+                        });
+                    } else {
+                        // 否则显示简单的行号和内容表格
+                        tableHtml += '<thead><tr style="border-bottom:2px solid var(--border-color);"><th style="padding:8px;text-align:left;">行号</th><th style="padding:8px;text-align:left;">内容</th></tr></thead>';
+                        tableHtml += '<tbody>';
+                        
+                        data.structured_data.forEach((item, index) => {
+                            tableHtml += `
+                                <tr style="border-bottom:1px solid var(--border-color);">
+                                    <td style="padding:8px;">${item.line_number || (index + 1)}</td>
+                                    <td style="padding:8px;">${item.content || item.original_text || item.text}</td>
+                                </tr>
+                            `;
+                        });
+                    }
+                    
+                    tableHtml += '</tbody></table>';
+                    ocrResultsContent.innerHTML = tableHtml;
+                } else {
+                    ocrResultsContent.innerHTML = '<div style="padding: 20px; text-align: center;">无法识别出有效的持仓信息</div>';
+                }
+            }
+            
+            // 重置OCR相关元素
+            function resetOCRComponents() {
+                dashboardImageUpload.value = '';
+                dashboardUploadedImage.style.display = 'none';
+                ocrResultsContainer.style.display = 'none';
+                ocrResultsContent.innerHTML = '';
+                ocrData = null;
+            }
+        });
         
         // 确认退出登录
         function confirmLogout() {
