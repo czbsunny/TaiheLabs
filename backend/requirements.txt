@@ -1,0 +1,31 @@
+# 后端Web框架
+Flask==2.0.3
+
+# 数据库相关
+SQLAlchemy==1.4.46
+pymysql==1.0.3
+
+# API文档
+Flask-RESTful==0.3.9
+
+# 数据处理
+pandas==2.3.2
+numpy==2.3.2
+
+# 安全相关
+python-dotenv==1.0.1
+PyJWT==2.4.0
+bcrypt==3.2.2
+
+# 其他工具
+requests==2.31.0
+
+# 数据库迁移
+Flask-Migrate==3.1.0
+Flask-Script==2.0.6
+
+# CORS支持
+Flask-Cors==3.0.10
+
+# 日志
+python-json-logger==2.0.4

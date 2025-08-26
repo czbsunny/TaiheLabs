@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>注册 - TaiheLabs</title>
+</head>
+<body>
+    <h2>注册</h2>
+    <form id="registerForm">
+        <label>用户名: <input type="text" name="username" required></label><br>
+        <label>邮箱: <input type="email" name="email" required></label><br>
+        <label>密码: <input type="password" name="password" required></label><br>
+        <button type="submit">注册</button>
+    </form>
+    <p>已有账号？<a href="/">登录</a></p>
+
+    <script>
+        const form = document.getElementById("registerForm");
+        form.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const data = new FormData(form);
+            const res = await fetch("/api/auth/register", {
+                method: "POST",
+                body: data
+            });
+            const json = await res.json();
+            if (res.ok) {
+                alert("注册成功！请登录");
+                window.location.href = "/";  // 注册成功后跳转到登录页
+            } else {
+                alert(json.detail || "注册失败");
+            }
+        });
+    </script>
+</body>
+</html>

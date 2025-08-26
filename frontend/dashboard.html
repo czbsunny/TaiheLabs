@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>组合管理</title>
+</head>
+<body>
+    <h1>用户 {{ user_id }} 的组合</h1>
+
+    <!-- 创建组合 -->
+    <form action="/portfolios/create" method="post">
+        <input type="hidden" name="user_id" value="{{ user_id }}">
+        <input type="text" name="name" placeholder="组合名称" required>
+        <button type="submit">创建组合</button>
+    </form>
+
+    <ul>
+        {% for p in portfolios %}
+        <li>
+            {{ p.name }} 
+            <form style="display:inline" action="/portfolios/delete" method="post">
+                <input type="hidden" name="user_id" value="{{ user_id }}">
+                <input type="hidden" name="portfolio_id" value="{{ p.id }}">
+                <button type="submit">删除</button>
+            </form>
+            <a href="/portfolio/{{ p.id }}/items">查看持仓明细</a>
+        </li>
+        {% else %}
+        <li>没有组合</li>
+        {% endfor %}
+    </ul>
+</body>
+</html>
