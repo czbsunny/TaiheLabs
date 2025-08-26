@@ -1,36 +1,136 @@
 <!DOCTYPE html>
-<html>
+<html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>登录 - TaiheLabs</title>
+    <link rel="stylesheet" href="/static/styles.css">
+    <link rel="stylesheet" href="/static/auth.css">
 </head>
 <body>
-    <h2>登录</h2>
-    <form id="loginForm">
-        <label>用户名: <input type="text" name="username" required></label><br>
-        <label>密码: <input type="password" name="password" required></label><br>
-        <button type="submit">登录</button>
-    </form>
-    <p>还没有账号？<a href="/register">注册</a></p>
+    <div class="login-container">
+        <div class="logo">
+            <h1>TaiheLabs</h1>
+        </div>
+        
+        <h2>账户登录</h2>
+        
+        <div id="errorMessage" class="error-message"></div>
+        <div id="successMessage" class="success-message"></div>
+        
+        <form id="loginForm">
+            <div class="form-group">
+                <label for="username">用户名</label>
+                <div class="input-container">
+                    <span class="input-icon">👤</span>
+                    <input type="text" id="username" name="username" required placeholder="请输入用户名">
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label for="password">密码</label>
+                <div class="input-container">
+                    <span class="input-icon">🔒</span>
+                    <input type="password" id="password" name="password" required placeholder="请输入密码">
+                </div>
+            </div>
+            
+            <div class="button-container">
+                <button type="submit">登录</button>
+            </div>
+        </form>
+        
+        <div class="form-footer">
+            <div class="register-link">
+                <p>还没有账号？<a href="/register">立即注册</a></p>
+            </div>
+        </div>
+    </div>
 
     <script>
         const form = document.getElementById("loginForm");
+        const errorMessage = document.getElementById("errorMessage");
+        const successMessage = document.getElementById("successMessage");
+        
+        // 检查URL中是否有登录失败的标志
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('error')) {
+            showError(urlParams.get('error') || '登录失败，请重试');
+        }
+        
         form.addEventListener("submit", async (e) => {
             e.preventDefault();
+            
+            // 清除之前的错误信息
+            hideMessages();
+            
+            // 获取表单数据
             const data = new FormData(form);
-            const res = await fetch("http://127.0.0.1:8000/api/auth/login", {
-                method: "POST",
-                body: data
-            });
-            const json = await res.json();
-            if (res.ok) {
-                alert("登录成功！");
-                // 登录成功后可以跳到用户主页
-                window.location.href = "dashboard.html";
-            } else {
-                alert(json.detail);
+            const username = data.get('username');
+            const password = data.get('password');
+            
+            // 简单的客户端验证
+            if (!username.trim()) {
+                showError('请输入用户名');
+                return;
+            }
+            
+            if (!password.trim()) {
+                showError('请输入密码');
+                return;
+            }
+            
+            try {
+                // 提交登录请求
+                const res = await fetch("/api/auth/login", {
+                    method: "POST",
+                    body: data
+                });
+                
+                const json = await res.json();
+                
+                if (res.ok) {
+                    // 显示成功信息并跳转
+                    showSuccess('登录成功，正在跳转...');
+                    setTimeout(() => {
+                        window.location.href = `/api/portfolio/${json.user_id}`;
+                    }, 1000);
+                } else {
+                    // 显示错误信息
+                    const errorText = json.detail || '登录失败，请检查用户名和密码';
+                    showError(errorText);
+                    
+                    // 如果是用户名或密码错误，添加一些视觉反馈
+                    if (errorText.includes('用户名或密码错误')) {
+                        document.getElementById('password').classList.add('error');
+                        setTimeout(() => {
+                            document.getElementById('password').classList.remove('error');
+                        }, 3000);
+                    }
+                }
+            } catch (error) {
+                showError('网络错误，请稍后重试');
             }
         });
+        
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorMessage.style.display = 'block';
+        }
+        
+        function showSuccess(message) {
+            successMessage.textContent = message;
+            successMessage.style.display = 'block';
+        }
+        
+        function hideMessages() {
+            errorMessage.style.display = 'none';
+            successMessage.style.display = 'none';
+        }
+        
+        // 为输入框添加焦点事件，清除错误提示
+        document.getElementById('username').addEventListener('focus', hideMessages);
+        document.getElementById('password').addEventListener('focus', hideMessages);
     </script>
 </body>
 </html>

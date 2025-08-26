@@ -1,5 +1,7 @@
 # 后端Web框架
 Flask==2.0.3
+fastapi==0.95.0
+uvicorn==0.22.0
 
 # 数据库相关
 SQLAlchemy==1.4.46
@@ -10,7 +12,7 @@ Flask-RESTful==0.3.9
 
 # 数据处理
 pandas==2.3.2
-numpy==2.3.2
+numpy==2.0.2
 
 # 安全相关
 python-dotenv==1.0.1

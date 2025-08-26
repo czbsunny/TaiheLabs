@@ -1,32 +1,270 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>组合管理</title>
+    <title>投资组合管理中心</title>
+    <link rel="stylesheet" href="/static/styles.css">
+    <link rel="stylesheet" href="/static/dashboard.css">
 </head>
 <body>
-    <h1>用户 {{ user_id }} 的组合</h1>
-
-    <!-- 创建组合 -->
-    <form action="/portfolios/create" method="post">
-        <input type="hidden" name="user_id" value="{{ user_id }}">
-        <input type="text" name="name" placeholder="组合名称" required>
-        <button type="submit">创建组合</button>
-    </form>
-
-    <ul>
-        {% for p in portfolios %}
-        <li>
-            {{ p.name }} 
-            <form style="display:inline" action="/portfolios/delete" method="post">
+    <div class="container">
+        <div class="dashboard-header">
+            <div class="header-content">
+                <div>
+                    <h1>投资组合管理中心</h1>
+                    <div class="dashboard-subtitle">管理您的投资组合、追踪持仓表现并优化资产配置</div>
+                </div>
+                <!-- 个人中心 -->
+                <div class="user-menu">
+                    <button id="userMenuButton" class="user-menu-button">
+                        <span class="user-icon">👤</span>
+                        <span class="user-name">用户</span>
+                        <span class="dropdown-arrow">▼</span>
+                    </button>
+                    <div id="userDropdown" class="user-dropdown">
+                        <a href="#" class="dropdown-item" onclick="showUserProfile()">个人资料</a>
+                        <a href="#" class="dropdown-item logout-item" onclick="confirmLogout()">退出登录</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 创建组合表单 -->
+        <div class="create-form">
+            <h3>创建新组合</h3>
+            <form action="/api/portfolio/create" method="post">
                 <input type="hidden" name="user_id" value="{{ user_id }}">
-                <input type="hidden" name="portfolio_id" value="{{ p.id }}">
-                <button type="submit">删除</button>
+                <input type="text" name="name" placeholder="组合名称" required>
+                <input type="text" name="description" placeholder="组合描述（可选）">
+                <button type="submit">创建组合</button>
             </form>
-            <a href="/portfolio/{{ p.id }}/items">查看持仓明细</a>
-        </li>
-        {% else %}
-        <li>没有组合</li>
+        </div>
+        
+        <!-- 投资组合标签页 -->
+        <div class="tabs">
+            {% for p in portfolios %}
+            <div class="tab-wrapper">
+                <button class="tab" onclick="openTab(event, 'portfolio-{{ p.id }}')">
+                    {{ p.name }}{% if p.description %}<span class="tab-desc">({{ p.description }})</span>{% endif %}
+                </button>
+                <button type="button" class="tab-close" onclick="confirmDeletePortfolioByTab(event, '{{ user_id|e }}', '{{ p.id|e }}')">&times;</button>
+            </div>
+            {% else %}
+            <div class="empty-state">
+                <div class="empty-state-icon">📊</div>
+                <h3>暂无投资组合</h3>
+                <p>点击上方的表单创建您的第一个投资组合</p>
+            </div>
+            {% endfor %}
+        </div>
+        
+        <!-- 每个组合的内容 -->
+        {% for p in portfolios %}
+        <div id="portfolio-{{ p.id }}" class="tab-content">
+            <div class="portfolio-info">
+                <div class="portfolio-stats">
+                    <div class="stat-item">
+                        <div class="stat-value">{{ p.items|length }}</div>
+                        <div class="stat-label">持仓数量</div>
+                    </div>
+                    {% set total_cost = p.items|sum(attribute='quantity') * p.items|sum(attribute='cost') / p.items|length if p.items else 0 %}
+                    <div class="stat-item">
+                        <div class="stat-value">¥{{ "%.2f"|format(total_cost) }}</div>
+                        <div class="stat-label">总成本</div>
+                    </div>
+                </div>
+            </div>
+            
+
+            
+            <!-- 添加持仓表单 -->
+            <div class="portfolio-items">
+                <div class="add-item-form">
+                    <h4>添加持仓</h4>
+                    <form action="/api/portfolio/{{ p.id }}/items/add" method="post">
+                        <div class="form-group">
+                            <input type="text" name="symbol" placeholder="基金/股票代码" required>
+                            <input type="number" name="quantity" placeholder="持有数量" step="0.01" required>
+                            <input type="number" name="cost" placeholder="单位成本" step="0.01" required>
+                            <button type="submit">添加</button>
+                        </div>
+                    </form>
+                </div>
+                
+                <!-- 持仓明细表格 -->
+                <h4>持仓明细</h4>
+                {% if p.items %}
+                <table>
+                    <thead>
+                        <tr>
+                            <th>代码</th>
+                            <th>数量</th>
+                            <th>单位成本</th>
+                            <th>总成本</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in p.items %}
+                        <tr>
+                            <td>{{ item.symbol }}</td>
+                            <td>{{ item.quantity }}</td>
+                            <td>¥{{ "%.2f"|format(item.cost) }}</td>
+                            <td>¥{{ "%.2f"|format(item.quantity * item.cost) }}</td>
+                            <td>
+                                <form style="display:inline" action="/api/portfolio/{{ p.id }}/items/delete" method="post">
+                                    <input type="hidden" name="item_id" value="{{ item.id }}">
+                                    <button type="button" class="delete-btn" onclick="confirmDeleteItem(this.form)">删除</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <div class="empty-state">
+                    <div class="empty-state-icon">📈</div>
+                    <h3>暂无持仓</h3>
+                    <p>使用上方表单添加您的第一支股票或基金</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
         {% endfor %}
-    </ul>
+    </div>
+    
+    <script>
+        // 标签页切换功能
+        function openTab(evt, tabName) {
+            // 隐藏所有标签内容
+            var tabContent = document.getElementsByClassName("tab-content");
+            for (var i = 0; i < tabContent.length; i++) {
+                tabContent[i].classList.remove("active");
+            }
+            
+            // 移除所有标签的active类
+            var tabs = document.getElementsByClassName("tab");
+            for (var i = 0; i < tabs.length; i++) {
+                tabs[i].classList.remove("active");
+            }
+            
+            // 显示当前标签内容并设置当前标签为active
+            document.getElementById(tabName).classList.add("active");
+            evt.currentTarget.classList.add("active");
+        }
+        
+        // 删除组合确认函数
+        function confirmDeletePortfolio(form) {
+            if (confirm('确定要删除该组合吗？这将同时删除所有持仓明细。')) {
+                console.log('确认删除组合，提交表单:', form.action);
+                form.submit();
+            } else {
+                console.log('取消删除组合');
+            }
+        }
+        
+        // 通过标签页关闭按钮删除组合
+        function confirmDeletePortfolioByTab(event, userId, portfolioId) {
+            event.stopPropagation(); // 阻止事件冒泡，防止触发标签页点击
+            if (confirm('确定要删除该组合吗？这将同时删除所有持仓明细。')) {
+                console.log('确认删除组合，用户ID:', userId, '组合ID:', portfolioId);
+                // 创建表单并提交
+                var form = document.createElement('form');
+                form.method = 'post';
+                form.action = '/api/portfolio/delete';
+                
+                var userIdInput = document.createElement('input');
+                userIdInput.type = 'hidden';
+                userIdInput.name = 'user_id';
+                userIdInput.value = userId;
+                form.appendChild(userIdInput);
+                
+                var portfolioIdInput = document.createElement('input');
+                portfolioIdInput.type = 'hidden';
+                portfolioIdInput.name = 'portfolio_id';
+                portfolioIdInput.value = portfolioId;
+                form.appendChild(portfolioIdInput);
+                
+                document.body.appendChild(form);
+                form.submit();
+            }
+        }
+        
+        // 删除持仓确认函数
+        function confirmDeleteItem(form) {
+            if (confirm('确定要删除该持仓吗？')) {
+                console.log('确认删除持仓，提交表单:', form.action);
+                form.submit();
+            } else {
+                console.log('取消删除持仓');
+            }
+        }
+        
+        // 默认打开第一个标签
+        document.addEventListener("DOMContentLoaded", function() {
+            var firstTab = document.querySelector(".tab");
+            if (firstTab) {
+                firstTab.click();
+            }
+            
+            // 添加调试代码检查删除按钮和表单
+            console.log("DOM 加载完成，开始检查删除功能");
+            
+            // 检查删除组合按钮
+            var deletePortfolioBtns = document.querySelectorAll(".delete-portfolio");
+            console.log("找到", deletePortfolioBtns.length, "个删除组合按钮");
+            
+            // 检查删除持仓按钮
+            var deleteItemBtns = document.querySelectorAll(".delete-btn");
+            console.log("找到", deleteItemBtns.length, "个删除持仓按钮");
+            
+            // 初始化个人中心菜单
+            initUserMenu();
+        });
+        
+        // 初始化个人中心菜单
+        function initUserMenu() {
+            const userMenuButton = document.getElementById('userMenuButton');
+            const userDropdown = document.getElementById('userDropdown');
+            
+            if (userMenuButton && userDropdown) {
+                // 点击用户菜单按钮切换下拉菜单显示状态
+                userMenuButton.addEventListener('click', function() {
+                    userDropdown.classList.toggle('show');
+                    userMenuButton.classList.toggle('active');
+                });
+                
+                // 点击页面其他地方关闭下拉菜单
+                document.addEventListener('click', function(event) {
+                    if (!userMenuButton.contains(event.target) && !userDropdown.contains(event.target)) {
+                        userDropdown.classList.remove('show');
+                        userMenuButton.classList.remove('active');
+                    }
+                });
+                
+                // 防止点击下拉菜单内的项目关闭菜单
+                userDropdown.addEventListener('click', function(event) {
+                    event.stopPropagation();
+                });
+            }
+        }
+        
+        // 显示个人资料（模拟功能）
+        function showUserProfile() {
+            alert('个人资料功能将在后续版本中实现');
+        }
+        
+        // 确认退出登录
+        function confirmLogout() {
+            if (confirm('确定要退出登录吗？')) {
+                // 创建退出登录表单并提交
+                const form = document.createElement('form');
+                form.method = 'post';
+                form.action = '/api/auth/logout';
+                
+                document.body.appendChild(form);
+                form.submit();
+            }
+        }
+    </script>
 </body>
 </html>

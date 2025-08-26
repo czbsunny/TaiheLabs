@@ -1,0 +1,191 @@
+/* 全局重置和基础样式 */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+:root {
+    --primary-color: #667eea;
+    --primary-hover: #5a67d8;
+    --secondary-color: #764ba2;
+    --success-color: #276749;
+    --success-bg: #c6f6d5;
+    --error-color: #c53030;
+    --error-bg: #fed7d7;
+    --text-primary: #333;
+    --text-secondary: #555;
+    --text-muted: #666;
+    --text-light: #888;
+    --bg-light: #f5f5f5;
+    --bg-white: #ffffff;
+    --border-color: #e1e5e9;
+    --shadow-light: 0 2px 10px rgba(0,0,0,0.1);
+    --shadow-medium: 0 10px 30px rgba(0, 0, 0, 0.1);
+    --border-radius: 8px;
+    --border-radius-large: 12px;
+}
+
+body {
+    min-height: 100vh;
+    color: var(--text-primary);
+    background-color: var(--bg-light);
+    line-height: 1.6;
+}
+
+/* 通用表单元素样式 */
+input {
+    width: 100%;
+    padding: 12px 16px;
+    border: 2px solid var(--border-color);
+    border-radius: var(--border-radius);
+    font-size: 16px;
+    transition: all 0.3s ease;
+    background-color: var(--bg-white);
+}
+
+input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+input::placeholder {
+    color: var(--text-light);
+}
+
+button {
+    padding: 12px 24px;
+    background: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: var(--border-radius);
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+button::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+    transition: all 0.6s ease;
+}
+
+button:hover {
+    background: var(--primary-hover);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+button:hover::before {
+    left: 100%;
+}
+
+button:active {
+    transform: translateY(0);
+}
+
+/* 消息提示样式 */
+.error-message {
+    background: var(--error-bg);
+    color: var(--error-color);
+    padding: 12px 16px;
+    border-radius: var(--border-radius);
+    margin-bottom: 20px;
+    border: 1px solid #feb2b2;
+    display: none;
+    transition: all 0.3s ease;
+    animation: slideIn 0.3s ease;
+}
+
+.success-message {
+    background: var(--success-bg);
+    color: var(--success-color);
+    padding: 12px 16px;
+    border-radius: var(--border-radius);
+    margin-bottom: 20px;
+    border: 1px solid #81c784;
+    display: none;
+    transition: all 0.3s ease;
+    animation: slideIn 0.3s ease;
+}
+
+/* 链接样式 */
+a {
+    color: var(--primary-color);
+    text-decoration: none;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+a::after {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    left: 0;
+    width: 0;
+    height: 2px;
+    background: var(--primary-color);
+    transition: width 0.3s ease;
+}
+
+a:hover {
+    text-decoration: none;
+    color: var(--primary-hover);
+}
+
+a:hover::after {
+    width: 100%;
+}
+
+/* 容器基础样式 */
+.container {
+    background: var(--bg-white);
+    border-radius: var(--border-radius-large);
+    box-shadow: var(--shadow-light);
+    padding: 30px;
+    margin-bottom: 20px;
+    transition: all 0.3s ease;
+}
+
+.container:hover {
+    box-shadow: var(--shadow-medium);
+    transform: translateY(-2px);
+}
+
+/* 动画 */
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* 加载动画 */
+.loading {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    border-top-color: white;
+    animation: spin 1s ease-in-out infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
