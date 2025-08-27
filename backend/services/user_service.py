@@ -1,8 +1,8 @@
 from sqlalchemy.orm import Session
-from backend.models.user import User
-from backend.models.portfolio import Portfolio
-from backend.models.portfolio_detail import PortfolioDetail
-from backend.utils.snowflake import snowflake
+from models.user import User
+from models.portfolio import Portfolio
+from models.portfolio_item import PortfolioItem
+from utils.snowflake import snowflake
 
 class UserService:
     def __init__(self, db: Session):
@@ -35,16 +35,11 @@ class UserService:
         if not user:
             return None
 
-        portfolios = self.db.query(Portfolio).filter(
-            Portfolio.user_id == user_id,
-            Portfolio.is_deleted == False
-        ).all()
+        portfolios = self.db.query(Portfolio).filter(Portfolio.user_id == user_id).all()
 
         result = []
         for p in portfolios:
-            details = self.db.query(PortfolioDetail).filter(
-                PortfolioDetail.portfolio_id == p.id
-            ).all()
+            details = self.db.query(PortfolioItem).filter(PortfolioItem.portfolio_id == p.id).all()
             result.append({
                 "portfolio": p,
                 "details": details

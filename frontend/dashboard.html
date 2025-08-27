@@ -1,455 +1,857 @@
 <!DOCTYPE html>
-<html>
+<html lang="zh-CN">
 <head>
-    <title>投资组合管理中心</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>基金投资组合管理</title>
     <link rel="stylesheet" href="/static/styles.css">
     <link rel="stylesheet" href="/static/dashboard.css">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#667eea',
+                        'primary-hover': '#5a67d8',
+                        secondary: '#764ba2',
+                        success: '#276749',
+                        'success-bg': '#c6f6d5',
+                        error: '#c53030',
+                        'error-bg': '#fed7d7',
+                    },
+                    fontFamily: {
+                        sans: ['-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .content-auto {
+                content-visibility: auto;
+            }
+            .scrollbar-hide {
+                -ms-overflow-style: none;
+                scrollbar-width: none;
+            }
+            .scrollbar-hide::-webkit-scrollbar {
+                display: none;
+            }
+        }
+    </style>
 </head>
 <body>
     <div class="container">
+        <!-- 页面头部 -->
         <div class="dashboard-header">
             <div class="header-content">
-                <div>
-                    <h1>投资组合管理中心</h1>
-                    <div class="dashboard-subtitle">管理您的投资组合、追踪持仓表现并优化资产配置</div>
-                </div>
-                <!-- 个人中心 -->
+                <h1 class="text-[clamp(1.5rem,3vw,2.5rem)] font-bold text-text-primary">基金投资组合管理</h1>
+                
+                <!-- 个人中心菜单 -->
                 <div class="user-menu">
                     <button id="userMenuButton" class="user-menu-button">
-                        <span class="user-icon">👤</span>
-                        <span class="user-name">用户</span>
-                        <span class="dropdown-arrow">▼</span>
+                        <span class="user-icon"><i class="fa fa-user-circle"></i></span>
+                        <span>{{ current_user.username }}</span>
+                        <span class="dropdown-arrow"><i class="fa fa-chevron-down"></i></span>
                     </button>
                     <div id="userDropdown" class="user-dropdown">
-                        <a href="#" class="dropdown-item" onclick="showUserProfile()">个人资料</a>
-                        <a href="#" class="dropdown-item logout-item" onclick="confirmLogout()">退出登录</a>
+                        <a href="javascript:void(0)" onclick="showUserProfile()" class="dropdown-item">个人资料</a>
+                        <a href="javascript:void(0)" onclick="confirmLogout()" class="dropdown-item">退出登录</a>
                     </div>
                 </div>
             </div>
-        </div>
-        
-        <!-- 创建组合表单 -->
-        <div class="create-form">
-            <h3>创建新组合</h3>
-            <form action="/api/portfolio/create" method="post">
-                <input type="hidden" name="user_id" value="{{ user_id }}">
-                <input type="text" name="name" placeholder="组合名称" required>
-                <input type="text" name="description" placeholder="组合描述（可选）">
-                <button type="submit">创建组合</button>
-            </form>
-            <div class="ocr-link-container">
-                <p>或者：</p>
-                <div class="image-upload-container">
-                    <label for="dashboardImageUpload" class="ocr-link-button">
-                        <span class="ocr-icon">📸</span>
-                        上传图片识别持仓组合
-                    </label>
-                    <input type="file" id="dashboardImageUpload" accept="image/*" style="display: none;">
-                </div>
-                
-                <!-- 已上传图片预览 -->
-                <img id="dashboardUploadedImage" alt="已上传的图片" style="max-width: 100%; max-height: 300px; border-radius: 8px; margin: 10px 0; display: none;">
-                
-                <!-- OCR结果显示区域 -->
-                <div id="ocrResultsContainer" style="margin-top: 20px; display: none;">
-                    <h4>识别结果</h4>
-                    <div id="ocrResultsContent" style="background: var(--background-light); padding: 15px; border-radius: 8px; max-height: 300px; overflow-y: auto;"></div>
-                    <button id="confirmOCRButton" class="confirm-button" style="margin-top: 10px; padding: 8px 16px; background: var(--primary-color); color: white; border: none; border-radius: 4px; cursor: pointer;">确认导入</button>
-                </div>
+            
+            <!-- 创建新组合表单 -->
+            <div id="createPortfolioForm" class="mt-4">
+                <form id="createPortfolioFormElement" method="post" action="/api/portfolio/create" class="flex gap-3">
+                    <input type="hidden" name="user_id" value="{{ current_user.id }}">
+                    <input type="text" name="name" placeholder="输入组合名称" required class="flex-grow">
+                    <button type="submit" class="bg-primary hover:bg-primary-hover text-white px-4 py-2 rounded">创建组合</button>
+                </form>
+                <div id="createPortfolioError" class="hidden text-error mt-2"></div>
             </div>
+            
+            <script>
+                // Add debugging for create portfolio form
+                document.addEventListener('DOMContentLoaded', function() {
+                    const createForm = document.getElementById('createPortfolioFormElement');
+                    const errorDiv = document.getElementById('createPortfolioError');
+                    
+                    if (createForm) {
+                        createForm.addEventListener('submit', function(e) {
+                            // Get form data
+                            const formData = new FormData(createForm);
+                            const formDataObj = {};
+                            formData.forEach((value, key) => {
+                                formDataObj[key] = value;
+                            });
+                            
+                            // Log form data before submission
+                            console.log('Submitting create portfolio form with data:', formDataObj);
+                            
+                            // For debugging purposes, we'll submit via fetch instead of default form submission
+                            e.preventDefault();
+                            
+                            fetch('/api/portfolio/create', {
+                                method: 'POST',
+                                body: formData
+                            })
+                            .then(response => {
+                                console.log('Response status:', response.status);
+                                if (response.ok) {
+                                    // Success - redirect manually
+                                    window.location.href = `/api/portfolio/${formDataObj.user_id}`;
+                                } else {
+                                    // Error - try to get detailed error message
+                                    return response.json().then(data => {
+                                        console.error('Create portfolio failed:', data);
+                                        errorDiv.textContent = `创建组合失败: ${data.detail || '未知错误'}`;
+                                        errorDiv.classList.remove('hidden');
+                                    });
+                                }
+                            })
+                            .catch(error => {
+                                console.error('Network error:', error);
+                                errorDiv.textContent = '网络错误，请稍后重试';
+                                errorDiv.classList.remove('hidden');
+                            });
+                        });
+                    }
+                });
+            </script>
         </div>
-        
+
         <!-- 投资组合标签页 -->
-        <div class="tabs">
-            {% for p in portfolios %}
-            <div class="tab-wrapper">
-                <button class="tab" onclick="openTab(event, 'portfolio-{{ p.id }}')">
-                    {{ p.name }}{% if p.description %}<span class="tab-desc">({{ p.description }})</span>{% endif %}
+        <div class="tabs-wrapper">
+            <div class="tabs" id="portfolioTabs">
+                <!-- 全部tab - 默认显示 -->
+                <button class="tab active" data-tab="allPortfolios">
+                    全部
                 </button>
-                <button type="button" class="tab-close" onclick="confirmDeletePortfolioByTab(event, '{{ user_id|e }}', '{{ p.id|e }}')">&times;</button>
+                
+                <!-- 投资组合标签页 - 动态生成 -->
+                {% for p in portfolios %}
+                <button class="tab" data-tab="portfolio-{{ p.id }}">
+                    {{ p.name }}
+                    <span class="tab-desc">
+                        {% if p.total_value %}
+                        ¥{{ "%.2f"|format(p.total_value) }}
+                        {% else %}
+                        ¥0.00
+                        {% endif %}
+                    </span>
+                </button>
+                {% endfor %}
             </div>
-            {% else %}
-            <div class="empty-state">
-                <div class="empty-state-icon">📊</div>
-                <h3>暂无投资组合</h3>
-                <p>点击上方的表单创建您的第一个投资组合</p>
-            </div>
-            {% endfor %}
         </div>
-        
-        <!-- 每个组合的内容 -->
-        {% for p in portfolios %}
-        <div id="portfolio-{{ p.id }}" class="tab-content">
+
+        <!-- 投资组合内容区域 -->
+        <!-- 全部组合汇总tab内容 -->
+        <div class="tab-content active" id="allPortfolios">
             <div class="portfolio-info">
+                <div class="portfolio-header">
+                    <h2>全部组合汇总</h2>
+                </div>
+                
+                <!-- 总体统计信息 -->
                 <div class="portfolio-stats">
                     <div class="stat-item">
-                        <div class="stat-value">{{ p.items|length }}</div>
-                        <div class="stat-label">持仓数量</div>
+                        <span class="stat-label">总资产</span>
+                        <span class="stat-value">
+                            {% set total_all_value = portfolios | sum(attribute='total_value') | default(0) %}
+                            ¥{{ "%.2f"|format(total_all_value) }}
+                        </span>
                     </div>
-                    {% set total_cost = p.items|sum(attribute='quantity') * p.items|sum(attribute='cost') / p.items|length if p.items else 0 %}
                     <div class="stat-item">
-                        <div class="stat-value">¥{{ "%.2f"|format(total_cost) }}</div>
-                        <div class="stat-label">总成本</div>
+                        <span class="stat-label">持有收益</span>
+                        <span class="stat-value {% if total_all_profit and total_all_profit > 0 %}positive{% elif total_all_profit and total_all_profit < 0 %}negative{% endif %}">
+                            {% set total_all_profit = portfolios | sum(attribute='total_profit') | default(0) %}
+                            ¥{{ "%.2f"|format(total_all_profit) }}
+                        </span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">当日收益</span>
+                        <span class="stat-value {% if total_all_daily_profit and total_all_daily_profit > 0 %}positive{% elif total_all_daily_profit and total_all_daily_profit < 0 %}negative{% endif %}">
+                            {% set total_all_daily_profit = portfolios | sum(attribute='daily_profit') | default(0) %}
+                            ¥{{ "%.2f"|format(total_all_daily_profit) }}
+                        </span>
                     </div>
                 </div>
             </div>
             
-
-            
-            <!-- 添加持仓表单 -->
-            <div class="portfolio-items">
-                <div class="add-item-form">
-                    <h4>添加持仓</h4>
-                    <form action="/api/portfolio/{{ p.id }}/items/add" method="post">
-                        <div class="form-group">
-                            <input type="text" name="symbol" placeholder="基金/股票代码" required>
-                            <input type="number" name="quantity" placeholder="持有数量" step="0.01" required>
-                            <input type="number" name="cost" placeholder="单位成本" step="0.01" required>
-                            <button type="submit">添加</button>
+            <!-- 各组合简要信息卡片 -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-6">
+                {% for p in portfolios %}
+                <div class="bg-white rounded-lg shadow-md p-4 border border-border-color hover:shadow-lg transition-shadow">
+                    {% if not p.holdings %}
+                    <!-- 空组合卡片 -->
+                    <div class="flex justify-between items-center mb-3">
+                        <h3 class="font-semibold text-lg">{{ p.name }}</h3>
+                        <span class="text-sm text-text-muted">{{ p.holdings | length }}只基金</span>
+                    </div>
+                    <div class="flex flex-col items-center py-6">
+                        <button class="importSummaryButton px-6 py-2 bg-primary hover:bg-primary-hover text-white rounded-full text-sm font-medium mb-2" data-portfolio-id="{{ p.id }}">
+                            导入基金实时看收益
+                        </button>
+                    </div>
+                    {% else %}
+                    <!-- 普通组合卡片 -->
+                    <div class="flex justify-between items-center mb-3">
+                        <h3 class="font-semibold text-lg">{{ p.name }}</h3>
+                        <span class="text-sm text-text-muted">{{ p.holdings | length }}只基金</span>
+                    </div>
+                    <div class="space-y-2 text-sm">
+                        <div class="flex justify-between">
+                            <span>总资产：</span>
+                            <span class="font-medium">¥{{ "%.2f"|format(p.total_value | default(0)) }}</span>
                         </div>
-                    </form>
+                        <div class="flex justify-between">
+                            <span>持有收益：</span>
+                            <span class="{% if p.total_profit and p.total_profit > 0 %}text-success{% elif p.total_profit and p.total_profit < 0 %}text-error{% endif %}">
+                                ¥{{ "%.2f"|format(p.total_profit | default(0)) }}
+                            </span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>当日收益：</span>
+                            <span class="{% if p.daily_profit and p.daily_profit > 0 %}text-success{% elif p.daily_profit and p.daily_profit < 0 %}text-error{% endif %}">
+                                ¥{{ "%.2f"|format(p.daily_profit | default(0)) }}
+                            </span>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- 各个投资组合内容 -->
+        {% for p in portfolios %}
+        <div class="tab-content" id="portfolio-{{ p.id }}">
+            <div class="portfolio-info">
+                <div class="portfolio-header">
+                    <h2>{{ p.name }}</h2>
+                    <div class="flex gap-2">
+                        <!-- 为每个组合添加导入持仓按钮 -->
+                        <button class="importHoldingsButton bg-primary hover:bg-primary-hover text-white px-4 py-2 rounded text-sm" data-portfolio-id="{{ p.id }}">
+                            <i class="fa fa-download mr-1"></i>导入基金实时看收益
+                        </button>
+                        <button onclick="confirmDeletePortfolio('{{ p.id }}', '{{ p.name }}')" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded text-sm">
+                            <i class="fa fa-trash mr-1"></i>删除组合
+                        </button>
+                    </div>
                 </div>
                 
-                <!-- 持仓明细表格 -->
-                <h4>持仓明细</h4>
-                {% if p.items %}
+                <!-- 组合统计信息 -->
+                <div class="portfolio-stats">
+                    <div class="stat-item">
+                        <span class="stat-label">总资产</span>
+                        <span class="stat-value">
+                            {% if p.total_value %}
+                            ¥{{ "%.2f"|format(p.total_value) }}
+                            {% else %}
+                            ¥0.00
+                            {% endif %}
+                        </span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">持有收益</span>
+                        <span class="stat-value {% if p.total_profit and p.total_profit > 0 %}positive{% elif p.total_profit and p.total_profit < 0 %}negative{% endif %}">
+                            {% if p.total_profit %}
+                            ¥{{ "%.2f"|format(p.total_profit) }}
+                            {% else %}
+                            ¥0.00
+                            {% endif %}
+                        </span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">当日收益</span>
+                        <span class="stat-value {% if p.daily_profit and p.daily_profit > 0 %}positive{% elif p.daily_profit and p.daily_profit < 0 %}negative{% endif %}">
+                            {% if p.daily_profit %}
+                            ¥{{ "%.2f"|format(p.daily_profit) }}
+                            {% else %}
+                            ¥0.00
+                            {% endif %}
+                        </span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 添加持仓按钮 -->
+            <div class="mb-6">
+                <button onclick="openAddHoldingModal('{{ p.id }}')" class="bg-primary hover:bg-primary-hover text-white px-6 py-2 rounded-lg flex items-center">
+                    <i class="fa fa-plus-circle mr-2"></i> 添加持仓
+                </button>
+            </div>
+            
+            <!-- 持仓列表 -->
+            <div class="holdings-table">
                 <table>
                     <thead>
                         <tr>
-                            <th>代码</th>
-                            <th>数量</th>
-                            <th>单位成本</th>
-                            <th>总成本</th>
+                            <th>基金名称</th>
+                            <th>基金代码</th>
+                            <th>持有份额</th>
+                            <th>购买单价</th>
+                            <th>当前单价</th>
+                            <th>持有成本</th>
+                            <th>当前市值</th>
+                            <th>持有收益</th>
+                            <th>当日收益</th>
                             <th>操作</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {% for item in p.items %}
+                        {% for holding in p.holdings %}
                         <tr>
-                            <td>{{ item.symbol }}</td>
-                            <td>{{ item.quantity }}</td>
-                            <td>¥{{ "%.2f"|format(item.cost) }}</td>
-                            <td>¥{{ "%.2f"|format(item.quantity * item.cost) }}</td>
+                            <td>{{ holding.fund_name }}</td>
+                            <td>{{ holding.fund_code }}</td>
+                            <td>{{ "%.2f"|format(holding.shares) }}</td>
+                            <td>{{ "%.2f"|format(holding.purchase_price) }}</td>
+                            <td>{{ "%.2f"|format(holding.current_price) }}</td>
+                            <td>{{ "%.2f"|format(holding.shares * holding.purchase_price) }}</td>
+                            <td>{{ "%.2f"|format(holding.shares * holding.current_price) }}</td>
+                            <td class="{% if holding.total_profit > 0 %}text-success{% elif holding.total_profit < 0 %}text-error{% endif %}">
+                                {{ "%.2f"|format(holding.total_profit) }}
+                            </td>
+                            <td class="{% if holding.daily_profit > 0 %}text-success{% elif holding.daily_profit < 0 %}text-error{% endif %}">
+                                {{ "%.2f"|format(holding.daily_profit) }}
+                            </td>
                             <td>
-                                <form style="display:inline" action="/api/portfolio/{{ p.id }}/items/delete" method="post">
-                                    <input type="hidden" name="item_id" value="{{ item.id }}">
-                                    <button type="button" class="delete-btn" onclick="confirmDeleteItem(this.form)">删除</button>
-                                </form>
+                                <button onclick="confirmDeleteHolding('{{ holding.id }}', '{{ p.id }}')" class="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded text-xs">
+                                    <i class="fa fa-trash"></i>
+                                </button>
                             </td>
                         </tr>
                         {% endfor %}
+                        {% if not p.holdings %}
+                        <tr>
+                            <td colspan="11" class="text-center py-10">
+                                <div class="flex flex-col items-center justify-center space-y-4">
+                                    <div class="bg-yellow-50 p-6 rounded-full">
+                                        <i class="fa fa-file-text-o text-yellow-500 text-3xl"></i>
+                                    </div>
+                                    <p class="text-text-secondary">暂无持仓数据</p>
+                                    <p class="text-text-muted text-sm mb-4">导入持仓实时看收益</p>
+                                    <button class="importEmptyStateButton px-8 py-3 bg-primary hover:bg-primary-hover text-white rounded-full text-lg font-medium" data-portfolio-id="{{ p.id }}">
+                            导入基金实时看收益
+                        </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endif %}
                     </tbody>
                 </table>
-                {% else %}
-                <div class="empty-state">
-                    <div class="empty-state-icon">📈</div>
-                    <h3>暂无持仓</h3>
-                    <p>使用上方表单添加您的第一支股票或基金</p>
-                </div>
-                {% endif %}
             </div>
         </div>
         {% endfor %}
     </div>
-    
+
     <script>
+        // 存储OCR识别结果
+        let ocrData = null;
+
         // 标签页切换功能
-        function openTab(evt, tabName) {
-            // 隐藏所有标签内容
-            var tabContent = document.getElementsByClassName("tab-content");
-            for (var i = 0; i < tabContent.length; i++) {
-                tabContent[i].classList.remove("active");
-            }
-            
-            // 移除所有标签的active类
-            var tabs = document.getElementsByClassName("tab");
-            for (var i = 0; i < tabs.length; i++) {
-                tabs[i].classList.remove("active");
-            }
-            
-            // 显示当前标签内容并设置当前标签为active
-            document.getElementById(tabName).classList.add("active");
-            evt.currentTarget.classList.add("active");
-        }
-        
-        // 删除组合确认函数
-        function confirmDeletePortfolio(form) {
-            if (confirm('确定要删除该组合吗？这将同时删除所有持仓明细。')) {
-                console.log('确认删除组合，提交表单:', form.action);
-                form.submit();
-            } else {
-                console.log('取消删除组合');
-            }
-        }
-        
-        // 通过标签页关闭按钮删除组合
-        function confirmDeletePortfolioByTab(event, userId, portfolioId) {
-            event.stopPropagation(); // 阻止事件冒泡，防止触发标签页点击
-            if (confirm('确定要删除该组合吗？这将同时删除所有持仓明细。')) {
-                console.log('确认删除组合，用户ID:', userId, '组合ID:', portfolioId);
-                // 创建表单并提交
-                var form = document.createElement('form');
-                form.method = 'post';
-                form.action = '/api/portfolio/delete';
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                // 移除所有标签页的活动状态
+                document.querySelectorAll('.tab').forEach(t => {
+                    t.classList.remove('active');
+                });
                 
-                var userIdInput = document.createElement('input');
-                userIdInput.type = 'hidden';
-                userIdInput.name = 'user_id';
-                userIdInput.value = userId;
-                form.appendChild(userIdInput);
+                // 添加当前标签页的活动状态
+                tab.classList.add('active');
                 
-                var portfolioIdInput = document.createElement('input');
-                portfolioIdInput.type = 'hidden';
-                portfolioIdInput.name = 'portfolio_id';
-                portfolioIdInput.value = portfolioId;
-                form.appendChild(portfolioIdInput);
+                // 隐藏所有内容区域
+                document.querySelectorAll('.tab-content').forEach(content => {
+                    content.classList.remove('active');
+                });
                 
-                document.body.appendChild(form);
-                form.submit();
-            }
-        }
+                // 显示当前标签页对应的内容区域
+                const tabId = tab.getAttribute('data-tab');
+                document.getElementById(tabId).classList.add('active');
+            });
+        });
+
+        // 用户菜单功能
+        const userMenuButton = document.getElementById('userMenuButton');
+        const userDropdown = document.getElementById('userDropdown');
         
-        // 删除持仓确认函数
-        function confirmDeleteItem(form) {
-            if (confirm('确定要删除该持仓吗？')) {
-                console.log('确认删除持仓，提交表单:', form.action);
-                form.submit();
-            } else {
-                console.log('取消删除持仓');
-            }
-        }
-        
-        // 默认打开第一个标签
-        document.addEventListener("DOMContentLoaded", function() {
-            var firstTab = document.querySelector(".tab");
-            if (firstTab) {
-                firstTab.click();
-            }
-            
-            // 添加调试代码检查删除按钮和表单
-            console.log("DOM 加载完成，开始检查删除功能");
-            
-            // 检查删除组合按钮
-            var deletePortfolioBtns = document.querySelectorAll(".delete-portfolio");
-            console.log("找到", deletePortfolioBtns.length, "个删除组合按钮");
-            
-            // 检查删除持仓按钮
-            var deleteItemBtns = document.querySelectorAll(".delete-btn");
-            console.log("找到", deleteItemBtns.length, "个删除持仓按钮");
-            
-            // 初始化个人中心菜单
-            initUserMenu();
+        userMenuButton.addEventListener('click', () => {
+            userDropdown.classList.toggle('active');
         });
         
-        // 初始化个人中心菜单
-        function initUserMenu() {
-            const userMenuButton = document.getElementById('userMenuButton');
-            const userDropdown = document.getElementById('userDropdown');
-            
-            if (userMenuButton && userDropdown) {
-                // 点击用户菜单按钮切换下拉菜单显示状态
-                userMenuButton.addEventListener('click', function() {
-                    userDropdown.classList.toggle('show');
-                    userMenuButton.classList.toggle('active');
-                });
-                
-                // 点击页面其他地方关闭下拉菜单
-                document.addEventListener('click', function(event) {
-                    if (!userMenuButton.contains(event.target) && !userDropdown.contains(event.target)) {
-                        userDropdown.classList.remove('show');
-                        userMenuButton.classList.remove('active');
-                    }
-                });
-                
-                // 防止点击下拉菜单内的项目关闭菜单
-                userDropdown.addEventListener('click', function(event) {
-                    event.stopPropagation();
-                });
+        // 点击其他区域关闭用户菜单
+        document.addEventListener('click', (event) => {
+            if (!userMenuButton.contains(event.target) && !userDropdown.contains(event.target)) {
+                userDropdown.classList.remove('active');
             }
-        }
-        
-        // 显示个人资料（模拟功能）
-        function showUserProfile() {
-            alert('个人资料功能将在后续版本中实现');
-        }
-        
-        // OCR图片上传和识别功能
+        });
+
+
+
+        // 导入持仓按钮事件 - 支持所有组合
         document.addEventListener('DOMContentLoaded', function() {
-            const dashboardImageUpload = document.getElementById('dashboardImageUpload');
-            const dashboardUploadedImage = document.getElementById('dashboardUploadedImage');
-            const ocrResultsContainer = document.getElementById('ocrResultsContainer');
-            const ocrResultsContent = document.getElementById('ocrResultsContent');
-            const confirmOCRButton = document.getElementById('confirmOCRButton');
-            let ocrData = null; // 存储OCR识别结果
-            
-            // 文件选择事件
-            if (dashboardImageUpload) {
-                dashboardImageUpload.addEventListener('change', function() {
-                    if (this.files && this.files[0]) {
-                        handleFileUpload(this.files[0]);
-                    }
-                });
-            }
-            
-            // 确认导入按钮点击事件
-            if (confirmOCRButton) {
-                confirmOCRButton.addEventListener('click', function() {
-                    if (ocrData && ocrData.structured_data && ocrData.structured_data.length > 0) {
-                        // 这里可以添加导入到投资组合的逻辑
-                        // 目前只是显示一个提示
-                        alert('识别结果已准备好导入，此功能将在后续版本中实现');
-                        
-                        // 重置OCR相关元素
-                        resetOCRComponents();
-                    } else {
-                        alert('没有可导入的识别结果');
-                    }
-                });
-            }
-            
-            // 处理文件上传
-            function handleFileUpload(file) {
-                // 显示上传的图片预览
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    dashboardUploadedImage.src = e.target.result;
-                    dashboardUploadedImage.style.display = 'block';
-                };
-                reader.readAsDataURL(file);
-                
-                // 调用OCR识别API
-                recognizePortfolio(file);
-            }
-            
-            // 调用OCR识别API
-            function recognizePortfolio(file) {
-                // 显示加载状态
-                ocrResultsContent.innerHTML = '<div style="text-align: center; padding: 20px;">正在识别图片内容，请稍候...</div>';
-                ocrResultsContainer.style.display = 'block';
-                
-                // 创建FormData对象
-                const formData = new FormData();
-                formData.append('file', file);
-                
-                // 发送请求
-                fetch('/api/ocr/recognize-portfolio', {
-                    method: 'POST',
-                    body: formData
-                })
-                .then(response => {
-                    if (!response.ok) {
-                        // 检查响应是否为JSON格式
-                        return response.text().then(text => {
-                            try {
-                                // 尝试解析文本为JSON
-                                const errorData = JSON.parse(text);
-                                throw new Error(errorData.error || '识别失败，请重试');
-                            } catch (jsonError) {
-                                // 如果不是有效的JSON，抛出原始错误
-                                throw new Error('服务器返回非预期响应，请稍后重试');
-                            }
-                        });
-                    }
-                    // 安全地尝试解析JSON
-                    return response.text().then(text => {
-                        try {
-                            return JSON.parse(text);
-                        } catch (e) {
-                            throw new Error('识别结果解析失败，请重试');
+            // 为所有导入持仓按钮添加事件监听
+            const importButtons = document.querySelectorAll('.importHoldingsButton, .importEmptyStateButton, .importSummaryButton');
+            importButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    // 获取组合ID
+                    const portfolioId = this.getAttribute('data-portfolio-id');
+                    // 创建隐藏的文件上传输入框
+                    const fileInput = document.createElement('input');
+                    fileInput.type = 'file';
+                    fileInput.accept = '.jpg,.jpeg,.png,.gif';
+                    fileInput.style.display = 'none';
+                    fileInput.addEventListener('change', function() {
+                        if (this.files.length > 0) {
+                            const formData = new FormData();
+                            formData.append('file', this.files[0]);
+                            formData.append('portfolio_id', portfolioId);
+                            
+                            // 显示导入中状态
+                            button.disabled = true;
+                            button.innerHTML = '<i class="fa fa-spinner fa-spin mr-1"></i>导入中...';
+                            
+                            // 发送导入请求
+                            fetch('/api/ocr/recognize-portfolio', {
+                                method: 'POST',
+                                body: formData
+                            })
+                            .then(response => {
+                                if (!response.ok) {
+                                    throw new Error('API调用失败：' + response.statusText);
+                                }
+                                return response.json();
+                            })
+                            .then(data => {
+                                if (data.status === 'success') {
+                                    // 显示基金选择弹窗
+                                    showFundSelectionModal(data.structured_data.portfolios, portfolioId);
+                                } else {
+                                    alert('识别失败：' + (data.message || '未知错误'));
+                                }
+                            })
+                            .catch(error => {
+                                console.error('导入请求失败:', error);
+                                alert('导入请求失败，请稍后重试');
+                            })
+                            .finally(() => {
+                                // 恢复按钮状态
+                                button.disabled = false;
+                                // 根据按钮类型设置不同的文本
+                                if (button.classList.contains('importSummaryButton')) {
+                                    button.innerHTML = '导入基金实时看收益';
+                                } else if (button.classList.contains('importEmptyStateButton')) {
+                                    button.innerHTML = '导入基金实时看收益';
+                                } else if (button.classList.contains('importHoldingsButton')) {
+                                    button.innerHTML = '<i class="fa fa-download mr-1"></i>导入基金实时看收益';
+                                }
+                                // 移除临时创建的文件输入框
+                                document.body.removeChild(fileInput);
+                            });
                         }
                     });
+                    // 添加到body并触发点击
+                    document.body.appendChild(fileInput);
+                    fileInput.click();
+                });
+            });
+        });
+
+        // 删除持仓确认
+        function confirmDeleteHolding(holdingId, portfolioId) {
+            if (confirm('确定要删除这条持仓记录吗？')) {
+                fetch(`/api/portfolio/${portfolioId}/delete-holding/${holdingId}`, {
+                    method: 'DELETE'
                 })
+                .then(response => response.json())
                 .then(data => {
-                    // 存储识别结果
-                    ocrData = data;
-                    
-                    // 显示识别结果
-                    displayRecognitionResults(data);
+                    if (data.success) {
+                        alert('删除成功');
+                        window.location.reload();
+                    } else {
+                        alert('删除失败：' + (data.message || '未知错误'));
+                    }
                 })
                 .catch(error => {
-                    // 显示友好的错误消息
-                    ocrResultsContent.innerHTML = `<div style="color: var(--danger-color); padding: 20px;">识别失败：${error.message}</div>`;
+                    console.error('删除请求失败:', error);
+                    alert('删除请求失败，请稍后重试');
                 });
             }
-            
-            // 显示识别结果
-            function displayRecognitionResults(data) {
-                if (data.structured_data && data.structured_data.length > 0) {
-                    // 创建表格显示结构化数据
-                    let tableHtml = '<table style="width:100%; border-collapse:collapse;">';
-                    
-                    // 检查数据结构，确定是否包含详细的基金字段
-                    const hasDetailedFields = data.structured_data.some(item => 
-                        item.fund_name || item.hold_amount || item.cumulative_profit
-                    );
-                    
-                    if (hasDetailedFields) {
-                        // 如果有详细的基金字段，显示完整的基金信息表格
-                        tableHtml += '<thead><tr style="border-bottom:2px solid var(--border-color);">';
-                        tableHtml += '<th style="padding:8px;text-align:left;">基金代码</th>';
-                        tableHtml += '<th style="padding:8px;text-align:left;">基金名称</th>';
-                        tableHtml += '<th style="padding:8px;text-align:left;">持仓金额</th>';
-                        tableHtml += '<th style="padding:8px;text-align:left;">持有收益</th>';
-                        tableHtml += '</tr></thead>';
-                        
-                        tableHtml += '<tbody>';
-                        
-                        data.structured_data.forEach(item => {
-                            // 只显示有价值的基金数据行
-                            if (item.fund_name || item.hold_amount) {
-                                tableHtml += `
-                                    <tr style="border-bottom:1px solid var(--border-color);">
-                                        <td style="padding:8px;">${item.fund_code || '-'}</td>
-                                        <td style="padding:8px;">${item.fund_name || item.original_text}</td>
-                                        <td style="padding:8px;">${item.hold_amount || '-'}</td>
-                                        <td style="padding:8px;">${item.hold_profit || '-'}</td>
-                                    </tr>
-                                `;
-                            }
-                        });
+        }
+
+        // 删除组合确认
+        function confirmDeletePortfolio(portfolioId, portfolioName) {
+            if (confirm(`确定要删除"${portfolioName}"组合吗？此操作不可恢复。`)) {
+                fetch(`/api/portfolio/delete/${portfolioId}`, {
+                    method: 'DELETE'
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert('删除成功');
+                        // 刷新整个页面以更新所有数据
+                        window.location.reload();
                     } else {
-                        // 否则显示简单的行号和内容表格
-                        tableHtml += '<thead><tr style="border-bottom:2px solid var(--border-color);"><th style="padding:8px;text-align:left;">行号</th><th style="padding:8px;text-align:left;">内容</th></tr></thead>';
-                        tableHtml += '<tbody>';
-                        
-                        data.structured_data.forEach((item, index) => {
-                            tableHtml += `
-                                <tr style="border-bottom:1px solid var(--border-color);">
-                                    <td style="padding:8px;">${item.line_number || (index + 1)}</td>
-                                    <td style="padding:8px;">${item.content || item.original_text || item.text}</td>
-                                </tr>
-                            `;
-                        });
+                        alert('删除失败：' + (data.message || '未知错误'));
                     }
-                    
-                    tableHtml += '</tbody></table>';
-                    ocrResultsContent.innerHTML = tableHtml;
-                } else {
-                    ocrResultsContent.innerHTML = '<div style="padding: 20px; text-align: center;">无法识别出有效的持仓信息</div>';
-                }
+                })
+                .catch(error => {
+                    console.error('删除请求失败:', error);
+                    alert('删除请求失败，请稍后重试');
+                });
             }
-            
-            // 重置OCR相关元素
-            function resetOCRComponents() {
-                dashboardImageUpload.value = '';
-                dashboardUploadedImage.style.display = 'none';
-                ocrResultsContainer.style.display = 'none';
-                ocrResultsContent.innerHTML = '';
-                ocrData = null;
-            }
-        });
-        
-        // 确认退出登录
+        }
+
+        // 退出登录确认
         function confirmLogout() {
             if (confirm('确定要退出登录吗？')) {
-                // 创建退出登录表单并提交
-                const form = document.createElement('form');
-                form.method = 'post';
-                form.action = '/api/auth/logout';
-                
-                document.body.appendChild(form);
-                form.submit();
+                window.location.href = '/api/auth/logout';
             }
+        }
+
+        // 显示用户资料
+        function showUserProfile() {
+            alert('个人资料功能将在后续版本中提供');
+        }
+
+        // 基金选择弹窗HTML结构 - 会在函数调用时动态添加
+        let fundSelectionModal; 
+
+        // 显示基金选择弹窗
+        function showFundSelectionModal(portfolios, portfolioId) {
+            // 检查是否已存在弹窗，存在则移除
+            if (fundSelectionModal) {
+                document.body.removeChild(fundSelectionModal);
+            }
+            
+            // 创建弹窗容器
+            fundSelectionModal = document.createElement('div');
+            fundSelectionModal.id = 'fundSelectionModal';
+            fundSelectionModal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+            fundSelectionModal.style.animation = 'fadeIn 0.3s ease-out';
+            
+            // 创建弹窗内容
+            fundSelectionModal.innerHTML = `
+                <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[80vh] overflow-hidden">
+                    <div class="p-4 border-b border-gray-200 flex justify-between items-center">
+                        <h3 class="text-lg font-semibold text-gray-800">选择要导入的基金</h3>
+                        <button id="closeModalBtn" class="text-gray-500 hover:text-gray-700">
+                            <i class="fa fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="p-4 max-h-[60vh] overflow-y-auto">
+                        <div class="space-y-4" id="fundList"></div>
+                    </div>
+                    <div class="p-4 border-t border-gray-200 flex justify-end space-x-3">
+                        <button id="cancelImportBtn" class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50">
+                            取消
+                        </button>
+                        <button id="confirmImportBtn" class="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary-hover">
+                            确认导入选中的基金
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            // 添加到文档
+            document.body.appendChild(fundSelectionModal);
+            
+            // 填充基金列表
+            const fundList = document.getElementById('fundList');
+            portfolios.forEach((fund, index) => {
+                const fundItem = document.createElement('div');
+                fundItem.className = 'flex items-start p-3 border border-gray-200 rounded-lg hover:bg-gray-50';
+                fundItem.innerHTML = `
+                    <input type="checkbox" id="fund-${index}" class="mt-1 mr-3 h-5 w-5 text-primary border-gray-300 rounded" checked>
+                    <div class="flex-1">
+                        <label for="fund-${index}" class="font-medium text-gray-800 cursor-pointer">${fund.name || '未知基金'}</label>
+                        ${fund.code ? `<div class="text-sm text-gray-500 mt-1">基金代码: ${fund.code}</div>` : ''}
+                        <div class="grid grid-cols-2 gap-2 mt-2 text-sm">
+                            ${fund.amount ? `<div><span class="text-gray-500">持仓金额:</span> <span class="font-medium">${fund.amount}</span></div>` : ''}
+                            ${fund.profit ? `<div><span class="text-gray-500">持有收益:</span> <span class="font-medium ${fund.profit.includes('+') ? 'text-green-600' : fund.profit.includes('-') ? 'text-red-600' : ''}">${fund.profit}</span></div>` : ''}
+                        </div>
+                        ${fund.type ? `<div class="text-xs text-gray-400 mt-1">来源: ${fund.type}</div>` : ''}
+                    </div>
+                `;
+                fundList.appendChild(fundItem);
+            });
+            
+            // 关闭弹窗事件
+            document.getElementById('closeModalBtn').addEventListener('click', closeFundSelectionModal);
+            document.getElementById('cancelImportBtn').addEventListener('click', closeFundSelectionModal);
+            
+            // 点击遮罩层关闭弹窗
+            fundSelectionModal.addEventListener('click', (e) => {
+                if (e.target === fundSelectionModal) {
+                    closeFundSelectionModal();
+                }
+            });
+            
+            // 确认导入事件
+            document.getElementById('confirmImportBtn').addEventListener('click', () => {
+                const selectedFunds = [];
+                const checkboxes = document.querySelectorAll('#fundList input[type="checkbox"]:checked');
+                
+                checkboxes.forEach(checkbox => {
+                    const index = parseInt(checkbox.id.split('-')[1]);
+                    selectedFunds.push(portfolios[index]);
+                });
+                
+                if (selectedFunds.length > 0) {
+                    importSelectedFunds(selectedFunds, portfolioId);
+                } else {
+                    alert('请至少选择一条基金记录');
+                }
+            });
+        }
+        
+        // 关闭基金选择弹窗
+        function closeFundSelectionModal() {
+            if (fundSelectionModal) {
+                document.body.removeChild(fundSelectionModal);
+                fundSelectionModal = null;
+            }
+        }
+        
+        // 导入选中的基金
+        function importSelectedFunds(selectedFunds, portfolioId) {
+            // 显示导入中状态
+            const modalContent = document.querySelector('#fundSelectionModal .bg-white');
+            modalContent.innerHTML = `
+                <div class="p-8 flex flex-col items-center justify-center">
+                    <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-primary mb-4"></div>
+                    <p class="text-gray-700 font-medium">正在导入 ${selectedFunds.length} 条基金记录...</p>
+                </div>
+            `;
+            
+            // 发送导入请求
+            fetch(`/api/portfolio/${portfolioId}/import-selected`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ funds: selectedFunds })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('导入请求失败');
+                }
+                return response.json();
+            })
+            .then(data => {
+                closeFundSelectionModal();
+                if (data.success) {
+                    // 创建自动消失的成功提示
+                    showAutoDisappearNotification(`成功导入 ${data.imported_count} 条基金记录`, 'success');
+                    
+                    // 从页面获取用户ID并跳转到正确的路由，确保从服务器重新获取最新数据
+                    setTimeout(() => {
+                        const userIdInput = document.querySelector('input[name="user_id"]');
+                        if (userIdInput && userIdInput.value) {
+                            window.location.href = `/api/portfolio/${userIdInput.value}`;
+                        } else {
+                            // 如果无法获取用户ID，则使用当前URL进行刷新
+                            window.location.reload();
+                        }
+                    }, 1500); // 延迟1.5秒后刷新页面
+                } else {
+                    // 创建自动消失的错误提示
+                    showAutoDisappearNotification('导入失败：' + (data.message || '未知错误'), 'error');
+                }
+            })
+            .catch(error => {
+                closeFundSelectionModal();
+                console.error('导入请求失败:', error);
+                alert('导入请求失败，请稍后重试');
+            });
+        }
+        // 显示自动消失的通知
+        function showAutoDisappearNotification(message, type = 'info') {
+            // 创建通知元素
+            const notification = document.createElement('div');
+            notification.className = `fixed top-4 right-4 px-4 py-3 rounded-lg shadow-lg z-50 transform transition-all duration-300 translate-x-full`;
+            
+            // 设置通知样式和内容
+            if (type === 'success') {
+                notification.classList.add('bg-success-bg', 'text-success', 'border-l-4', 'border-success');
+            } else if (type === 'error') {
+                notification.classList.add('bg-error-bg', 'text-error', 'border-l-4', 'border-error');
+            } else {
+                notification.classList.add('bg-gray-100', 'text-gray-800', 'border-l-4', 'border-gray-400');
+            }
+            
+            notification.innerHTML = `
+                <div class="flex items-center">
+                    <i class="fa ${type === 'success' ? 'fa-check-circle' : type === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle'}" style="margin-right: 10px;"></i>
+                    <span>${message}</span>
+                </div>
+            `;
+            
+            // 添加到页面
+            document.body.appendChild(notification);
+            
+            // 显示通知
+            setTimeout(() => {
+                notification.classList.remove('translate-x-full');
+                notification.classList.add('translate-x-0');
+            }, 10);
+            
+            // 3秒后自动消失
+            setTimeout(() => {
+                notification.classList.remove('translate-x-0');
+                notification.classList.add('translate-x-full');
+                setTimeout(() => {
+                    if (document.body.contains(notification)) {
+                        document.body.removeChild(notification);
+                    }
+                }, 300);
+            }, 3000);
+        }
+        
+        // 添加持仓弹窗相关功能
+        let addHoldingModal = null;
+        let currentPortfolioId = null;
+        
+        // 打开添加持仓弹窗
+        function openAddHoldingModal(portfolioId) {
+            currentPortfolioId = portfolioId;
+            
+            // 创建弹窗元素
+            addHoldingModal = document.createElement('div');
+            addHoldingModal.className = 'fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4';
+            addHoldingModal.setAttribute('id', 'addHoldingModal');
+            
+            // 弹窗内容
+            addHoldingModal.innerHTML = `
+                <div class="bg-white rounded-lg w-full max-w-md p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-xl font-semibold text-gray-800">添加基金持仓</h3>
+                        <button id="closeAddHoldingModalBtn" class="text-gray-500 hover:text-gray-700">
+                            <i class="fa fa-times text-xl"></i>
+                        </button>
+                    </div>
+                    
+                    <form id="addHoldingForm">
+                        <input type="hidden" name="portfolio_id" value="${portfolioId}">
+                        
+                        <div class="mb-4">
+                            <label for="fund_name" class="block text-sm font-medium text-gray-700 mb-1">基金名称</label>
+                            <input type="text" id="fund_name" name="fund_name" required 
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary">
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label for="fund_code" class="block text-sm font-medium text-gray-700 mb-1">基金代码 (可选)</label>
+                            <input type="text" id="fund_code" name="fund_code"
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary">
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label for="hold_amount" class="block text-sm font-medium text-gray-700 mb-1">持有金额 (元)</label>
+                            <input type="number" step="0.01" id="hold_amount" name="hold_amount" required 
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary">
+                        </div>
+                        
+                        <div class="mb-6">
+                            <label for="hold_profit" class="block text-sm font-medium text-gray-700 mb-1">持有收益 (元)</label>
+                            <input type="number" step="0.01" id="hold_profit" name="hold_profit" required 
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary">
+                        </div>
+                        
+                        <div class="flex justify-end space-x-3">
+                            <button type="button" id="cancelAddHoldingBtn" class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50">
+                                取消
+                            </button>
+                            <button type="submit" class="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary-hover">
+                                添加
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            `;
+            
+            // 添加到页面
+            document.body.appendChild(addHoldingModal);
+            
+            // 绑定事件
+            document.getElementById('closeAddHoldingModalBtn').addEventListener('click', closeAddHoldingModal);
+            document.getElementById('cancelAddHoldingBtn').addEventListener('click', closeAddHoldingModal);
+            document.getElementById('addHoldingForm').addEventListener('submit', handleAddHoldingSubmit);
+            
+            // 点击遮罩层关闭弹窗
+            addHoldingModal.addEventListener('click', (e) => {
+                if (e.target === addHoldingModal) {
+                    closeAddHoldingModal();
+                }
+            });
+        }
+        
+        // 关闭添加持仓弹窗
+        function closeAddHoldingModal() {
+            if (addHoldingModal) {
+                document.body.removeChild(addHoldingModal);
+                addHoldingModal = null;
+                currentPortfolioId = null;
+            }
+        }
+        
+        // 处理添加持仓表单提交
+        function handleAddHoldingSubmit(e) {
+            e.preventDefault();
+            
+            const form = e.target;
+            const formData = new FormData(form);
+            const data = {
+                portfolio_id: formData.get('portfolio_id'),
+                fund_name: formData.get('fund_name'),
+                fund_code: formData.get('fund_code'),
+                hold_amount: parseFloat(formData.get('hold_amount')),
+                hold_profit: parseFloat(formData.get('hold_profit'))
+            };
+            
+            // 构建symbol
+            let symbol = data.fund_name;
+            if (data.fund_code) {
+                symbol = `${data.fund_code} ${data.fund_name}`;
+            }
+            
+            // 假设单位成本为1，实际数量等于金额
+            // 这是一种简化处理，与后端逻辑保持一致
+            const cost = 1.0;
+            const quantity = data.hold_amount;
+            
+            // 发送添加持仓请求
+            fetch(`/api/portfolio/${data.portfolio_id}/items/add`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                },
+                body: new URLSearchParams({
+                    symbol: symbol,
+                    quantity: quantity,
+                    cost: cost,
+                    name: data.fund_name,
+                    hold_amount: data.hold_amount,
+                    hold_profit: data.hold_profit
+                })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('添加持仓失败');
+                }
+                closeAddHoldingModal();
+                alert('成功添加持仓');
+                // 刷新页面以显示最新数据
+                window.location.reload();
+            })
+            .catch(error => {
+                console.error('添加持仓失败:', error);
+                alert('添加持仓失败，请稍后重试');
+            });
         }
     </script>
 </body>

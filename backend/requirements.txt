@@ -4,7 +4,6 @@
 # 后端Web框架
 Flask==2.0.3
 fastapi==0.95.0
-uvicorn==0.22.0
 
 # 数据库相关
 SQLAlchemy==1.4.46
@@ -38,3 +37,7 @@ python-json-logger==2.0.4
 # OCR识别
 easyocr==1.7.1
 opencv-python==4.10.0.84
+
+uvicorn==0.35.0
+
+python-multipart==0.0.20
