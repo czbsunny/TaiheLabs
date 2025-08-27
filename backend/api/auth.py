@@ -42,7 +42,7 @@ def login(username: str = Form(...), password: str = Form(...), db: Session = De
         raise HTTPException(status_code=400, detail="用户名或密码错误")
     return {"message": "登录成功", "user_id": user.id, "username": user.username}
 
-@auth_router.post("/logout")
+@auth_router.get("/logout")
 def logout():
     # 在实际应用中，这里应该清除用户的会话信息
     # 由于当前是模拟环境，直接返回成功消息并跳转到登录页面
