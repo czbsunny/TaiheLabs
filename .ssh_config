@@ -1,0 +1,8 @@
+# GitHub configuration with HTTP proxy
+Host github.com
+    HostName github.com
+    User git
+    IdentityFile ~/.ssh/id_ed25519
+    ProxyCommand nc -X connect -x 127.0.0.1:7890 %h %p
+    UserKnownHostsFile ~/.ssh/known_hosts
+    StrictHostKeyChecking no
