@@ -238,6 +238,11 @@
                         <button class="importHoldingsButton bg-primary hover:bg-primary-hover text-white px-4 py-2 rounded text-sm" data-portfolio-id="{{ p.id }}">
                             <i class="fa fa-download mr-1"></i>导入基金实时看收益
                         </button>
+                        {% if p.holdings | length > 0 %}
+                        <button onclick="window.location.href = '/api/portfolio/diagnosis/page/{{ p.id }}'" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded text-sm">
+                            <i class="fa fa-stethoscope mr-1"></i>诊断组合
+                        </button>
+                        {% endif %}
                         <button onclick="confirmDeletePortfolio('{{ p.id }}', '{{ p.name }}')" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded text-sm">
                             <i class="fa fa-trash mr-1"></i>删除组合
                         </button>
@@ -374,6 +379,15 @@
                 document.getElementById(tabId).classList.add('active');
             });
         });
+        
+        // 如果有选中的组合ID，自动切换到对应tab
+        const selectedPortfolioId = "{{ selected_portfolio_id }}";
+        if (selectedPortfolioId && selectedPortfolioId !== "None") {
+            const targetTab = document.querySelector(`.tab[data-tab="portfolio-${selectedPortfolioId}"]`);
+            if (targetTab) {
+                targetTab.click();
+            }
+        }
 
         // 用户菜单功能
         const userMenuButton = document.getElementById('userMenuButton');
@@ -813,14 +827,12 @@
                 hold_profit: parseFloat(formData.get('hold_profit'))
             };
             
-            // 构建symbol
-            let symbol = data.fund_name;
-            if (data.fund_code) {
-                symbol = `${data.fund_code} ${data.fund_name}`;
-            }
+            console.log('Form data:', data);
+            console.log('Fund code value:', data.fund_code);
+            console.log('Fund name value:', data.fund_name);
             
-            // 假设单位成本为1，实际数量等于金额
-            // 这是一种简化处理，与后端逻辑保持一致
+            let symbol = data.fund_code;
+            console.log('Constructed symbol:', symbol);
             const cost = 1.0;
             const quantity = data.hold_amount;
             
@@ -835,6 +847,7 @@
                     quantity: quantity,
                     cost: cost,
                     name: data.fund_name,
+                    fund_code: data.fund_code, // 单独传递fund_code参数
                     hold_amount: data.hold_amount,
                     hold_profit: data.hold_profit
                 })

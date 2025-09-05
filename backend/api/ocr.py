@@ -18,7 +18,7 @@ ocr_handler = OCRHandler(languages=['ch_sim', 'en'], gpu=False)
 @ocr_router.post("/recognize-portfolio")
 async def recognize_portfolio(
     file: UploadFile = File(...),
-    save_blocks: bool = False
+    save_blocks: bool = True
 ):
     """
     识别图片中的持仓组合内容，直接调用OCR处理器的接口

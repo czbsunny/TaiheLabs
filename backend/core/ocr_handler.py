@@ -9,6 +9,9 @@ import tempfile
 import datetime
 from typing import List, Dict, Any, Optional, Tuple
 from fastapi import UploadFile
+from core.fund_processor import FundProcessor
+from sqlalchemy.orm import Session
+from database.init_db import get_db
 
 # 配置日志
 logging.basicConfig(level=logging.INFO)
@@ -24,7 +27,10 @@ class OCRHandler:
         """
         self.reader = easyocr.Reader(languages, gpu=gpu)
         logger.info(f"OCR处理器初始化完成，语言: {languages}, GPU: {gpu}")
-    
+        self._num_plain = re.compile(r'(?<![+\-])\b\d{1,3}(?:,\d{3})*(?:\.\d+)?\b(?!%)')
+        self._num_signed = re.compile(r'[+\-]?\d{1,3}(?:,\d{3})*(?:\.\d+)?(?!%)')
+        self._fund_code = re.compile(r'\b\d{6}\b')
+        
     def ensure_all_native_types(self, data: Any) -> Any:
         """递归确保所有数据都是可JSON序列化的Python原生类型
         
@@ -685,6 +691,13 @@ class OCRHandler:
                     block_info['name'] = self.normalize_name(block_info['name'])
                 block_info['type'] = source
                 
+                # 尝试提取基金代码（如果OCR结果中包含）
+                if 'code' not in block_info or not block_info['code']:
+                    if 'name' in block_info and block_info['name']:
+                        code_match = self._fund_code.search(block_info['name'])
+                        if code_match:
+                            block_info['code'] = code_match.group(0)
+                
         # 保存ROI图像
         block_image_path = None
         if save_blocks and blocks_dir and roi.size > 0:
@@ -744,12 +757,13 @@ class OCRHandler:
                 
                 # 提取文本块
                 blocks = self.extract_text_blocks(temp_file_path)
-                
+                print(len(blocks))
                 # 处理每个文本块并提取基金持仓信息
                 portfolios = []
                 saved_blocks_info = []
                 
                 for idx, block in enumerate(blocks):
+                    print(idx)
                     processed_block = self.process_block(img, block, save_blocks, blocks_dir)
                     
                     if processed_block['has_financial_data'] and processed_block['block_info']:
@@ -764,6 +778,36 @@ class OCRHandler:
                             'source': processed_block['source']
                         })
                 
+                # 使用FundProcessor增强基金信息
+                if portfolios:
+                    # 获取数据库会话
+                    db: Session = next(get_db())
+                    try:
+                        # 创建FundProcessor实例
+                        fund_processor = FundProcessor(db)
+                        
+                        # 提取所有基金名称
+                        fund_names = [p.get('name', '') for p in portfolios]
+                        
+                        # 批量增强基金信息
+                        enhanced_funds = fund_processor.batch_enhance_fund_info(fund_names)
+                        
+                        # 更新portfolios中的基金信息
+                        for i, portfolio in enumerate(portfolios):
+                            if i < len(enhanced_funds):
+                                enhanced_fund = enhanced_funds[i]
+                                # 只在有匹配结果时更新基金名称和代码
+                                if enhanced_fund['code']:
+                                    logger.info(f"增强基金信息: 原始名称='{portfolio.get('name', 'Unknown')}' -> 匹配名称='{enhanced_fund['name']}' (代码: {enhanced_fund['code']}, 匹配类型: {enhanced_fund.get('match_type', 'unknown')}, 得分: {enhanced_fund.get('match_score', 0.0)})")
+                                    portfolio['name'] = enhanced_fund['name']
+                                    portfolio['code'] = enhanced_fund['code']
+                                    portfolio['match_type'] = enhanced_fund.get('match_type', 'unknown')
+                                    portfolio['match_score'] = enhanced_fund.get('match_score', 0.0)
+                    except Exception as e:
+                        logger.error(f"增强基金信息失败: {str(e)}")
+                    finally:
+                        db.close()
+                        
                 # 构建结构化数据
                 structured_data = {
                     'total_portfolios': len(portfolios),

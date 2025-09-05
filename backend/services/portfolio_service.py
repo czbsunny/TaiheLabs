@@ -95,6 +95,7 @@ class PortfolioService:
 
     # 添加组合明细
     def add_item(self, portfolio_id: int, symbol: str, quantity: float, cost: float, name: str = None, hold_amount: float = None, hold_profit: float = None):
+        print(f"Adding new portfolio item: portfolio_id={portfolio_id}, symbol={symbol}, quantity={quantity}, cost={cost}, name={name}")
         item = PortfolioItem(
             portfolio_id=portfolio_id,
             symbol=symbol,
@@ -107,6 +108,7 @@ class PortfolioService:
         self.db.add(item)
         self.db.commit()
         self.db.refresh(item)
+        print(f"Successfully added portfolio item: id={item.id}, symbol={item.symbol}")
         return item
 
     # 删除组合明细

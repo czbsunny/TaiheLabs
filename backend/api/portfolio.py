@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Request, Form, Depends
+from fastapi import APIRouter, Request, Form, Depends, Query
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import RedirectResponse, JSONResponse
 from sqlalchemy.orm import Session
 from services.portfolio_service import PortfolioService
 from services.user_service import UserService
+from services.diagnosis_service import DiagnosisService
 from database.init_db import get_db
 from pathlib import Path
 import re
@@ -15,12 +16,12 @@ templates = Jinja2Templates(directory=str(base_dir / "frontend"))
 portfolio_router = APIRouter()
 
 @portfolio_router.get("/{user_id}")
-def portfolio_dashboard(request: Request, user_id: int, db: Session = Depends(get_db)):
+def portfolio_dashboard(request: Request, user_id: int, portfolio_id: int = Query(None), db: Session = Depends(get_db)):
     portfolio_service = PortfolioService(db)
     user_service = UserService(db)
     portfolios = portfolio_service.get_user_portfolios(user_id)
     current_user = user_service.get_user(user_id)
-    return templates.TemplateResponse("dashboard.html", {"request": request, "portfolios": portfolios, "user_id": user_id, "current_user": current_user})
+    return templates.TemplateResponse("dashboard.html", {"request": request, "portfolios": portfolios, "user_id": user_id, "current_user": current_user, "selected_portfolio_id": portfolio_id})
 
 @portfolio_router.post("/create")
 async def create_portfolio(request: Request, db: Session = Depends(get_db)):
@@ -87,52 +88,43 @@ def delete_portfolio(portfolio_id: int, db: Session = Depends(get_db)):
     else:
         return JSONResponse(status_code=404, content={"success": False, "message": "Portfolio not found"})
 
-@portfolio_router.post("/import-from-ocr")
-async def import_from_ocr(request: Request, db: Session = Depends(get_db)):
+@portfolio_router.get("/diagnosis/{portfolio_id}")
+def get_portfolio_diagnosis(portfolio_id: int, db: Session = Depends(get_db)):
     """
-    从OCR识别结果导入持仓数据
+    获取组合诊断结果
     """
-    try:
-        import_data = await request.json()
-        portfolio_id = import_data.get('portfolio_id')
-        ocr_portfolios = import_data.get('portfolios', [])
-        
-        portfolio_service = PortfolioService(db)
-        added_count = 0
-        
-        # 遍历每个识别到的投资组合
-        for portfolio in ocr_portfolios:
-            # 遍历组合中的每个基金
-            if 'funds' in portfolio:
-                for fund in portfolio['funds']:
-                    # 提取基金信息
-                    fund_code = fund.get('code', '') or fund.get('fund_code', '') or ''
-                    # 尝试从基金名称中提取基金代码
-                    if not fund_code and fund.get('name', ''):
-                        code_match = re.search(r'[0-9]{6}', fund.get('name', ''))
-                        if code_match:
-                            fund_code = code_match.group(0)
-                    
-                    shares = float(fund.get('shares', 0))
-                    purchase_price = float(fund.get('purchase_price', 0))
-                    
-                    # 计算成本（持有份额 × 购买单价）
-                    cost = shares * purchase_price
-                    
-                    if fund_code and shares > 0 and cost > 0:
-                        portfolio_service.add_item(
-                            portfolio_id=portfolio_id,
-                            symbol=fund_code,
-                            quantity=shares,
-                            cost=cost
-                        )
-                        added_count += 1
-        
-        return {"success": True, "added_count": added_count}
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return {"success": False, "message": str(e)}
+    print(f"[诊断请求] 收到组合诊断请求，组合ID: {portfolio_id}")
+    diagnosis_service = DiagnosisService(db)
+    diagnosis_result = diagnosis_service.get_portfolio_diagnosis(portfolio_id)
+    
+    print(f"[诊断结果] 组合ID: {portfolio_id}, 诊断结果: {diagnosis_result}")
+    
+    if not diagnosis_result:
+        print(f"[诊断错误] 组合ID: {portfolio_id}, 未找到组合")
+        return JSONResponse(status_code=404, content={"success": False, "message": "Portfolio not found"})
+    
+    return JSONResponse(status_code=200, content={"success": True, "data": diagnosis_result})
+
+@portfolio_router.get("/diagnosis/page/{portfolio_id}")
+def diagnosis_page(request: Request, portfolio_id: int, db: Session = Depends(get_db)):
+    """
+    返回组合诊断页面
+    """
+    portfolio_service = PortfolioService(db)
+    portfolio_data = portfolio_service.get_portfolio_items(portfolio_id)
+    user_id = portfolio_data["portfolio"].user_id if portfolio_data else 1  # 默认值为1
+    return templates.TemplateResponse("diagnosis.html", {"request": request, "portfolio_id": portfolio_id, "user_id": user_id})
+
+@portfolio_router.get("/diagnosis.html")
+def diagnosis_page_with_query_param(request: Request, portfolio_id: int = Query(...), db: Session = Depends(get_db)):
+    """
+    通过查询参数接收portfolio_id的诊断页面路由
+    兼容前端通过查询参数传递portfolio_id的情况
+    """
+    portfolio_service = PortfolioService(db)
+    portfolio_data = portfolio_service.get_portfolio_items(portfolio_id)
+    user_id = portfolio_data["portfolio"].user_id if portfolio_data else 1  # 默认值为1
+    return templates.TemplateResponse("diagnosis.html", {"request": request, "portfolio_id": portfolio_id, "user_id": user_id})
 
 @portfolio_router.get("/{portfolio_id}/items")
 def view_portfolio_items(request: Request, portfolio_id: int, db: Session = Depends(get_db)):
@@ -150,9 +142,14 @@ def view_portfolio_items(request: Request, portfolio_id: int, db: Session = Depe
 @portfolio_router.post("/{portfolio_id}/items/add")
 def add_portfolio_item(portfolio_id: int, symbol: str = Form(...), quantity: float = Form(...),
                        cost: float = Form(...), name: str = Form(None), hold_amount: float = Form(None),
-                       hold_profit: float = Form(None), db: Session = Depends(get_db)):
+                       hold_profit: float = Form(None), fund_code: str = Form(None), db: Session = Depends(get_db)):
+    print(f"API received: portfolio_id={portfolio_id}, symbol={symbol}, fund_code={fund_code}, quantity={quantity}")
     portfolio_service = PortfolioService(db)
-    portfolio_service.add_item(portfolio_id, symbol, quantity, cost, name=name, hold_amount=hold_amount, hold_profit=hold_profit)
+    # 如果提供了fund_code，就使用它，否则使用symbol作为fallback
+    # 这样确保基金代码栏只显示code而不是code+name的组合
+    actual_symbol = fund_code if fund_code else symbol
+    print(f"Using actual_symbol={actual_symbol}")
+    portfolio_service.add_item(portfolio_id, actual_symbol, quantity, cost, name=name, hold_amount=hold_amount, hold_profit=hold_profit)
     # 获取用户ID以重定向回dashboard
     portfolio = portfolio_service.get_portfolio_items(portfolio_id)
     if portfolio:
@@ -168,48 +165,6 @@ def delete_portfolio_item(portfolio_id: int, item_id: int = Form(...), db: Sessi
     if portfolio:
         return RedirectResponse(url=f"/api/portfolio/{portfolio['portfolio'].user_id}", status_code=303)
     return RedirectResponse(url=f"/api/portfolio/{portfolio_id}/items", status_code=303)
-
-@portfolio_router.post("/import-from-ocr")
-async def import_portfolio_from_ocr(request: Request, db: Session = Depends(get_db)):
-    try:
-        # 获取JSON数据
-        data = await request.json()
-        portfolio_id = data.get("portfolio_id")
-        portfolios = data.get("portfolios", [])
-        
-        if not portfolio_id or not portfolios:
-            return {"success": False, "message": "缺少必要的参数"}
-        
-        portfolio_service = PortfolioService(db)
-        added_count = 0
-        
-        # 遍历所有持仓项并添加到投资组合
-        for item in portfolios:
-            # 获取基金代码和名称
-            fund_code = item.get("code") or item.get("fund_code") or ""
-            fund_name = item.get("name") or item.get("fund_name") or ""
-            
-            # 构建symbol，使用代码和名称的组合
-            symbol = f"{fund_code} {fund_name}" if fund_code else fund_name
-            
-            # 获取持仓金额和单位成本
-            hold_amount = item.get("hold_amount") or 0
-            cost = item.get("unit_cost") or 0
-            
-            # 计算数量（假设单位成本不为0）
-            quantity = hold_amount / cost if cost > 0 else 0
-            
-            # 添加持仓项
-            if symbol and quantity > 0:
-                portfolio_service.add_item(portfolio_id, symbol, quantity, cost)
-                added_count += 1
-        
-        return {"success": True, "added_count": added_count}
-    except Exception as e:
-        # 记录异常
-        import traceback
-        traceback.print_exc()
-        return {"success": False, "message": str(e)}
 
 @portfolio_router.post("/{portfolio_id}/import-selected")
 async def import_selected_funds(portfolio_id: int, request: Request, db: Session = Depends(get_db)):
@@ -240,7 +195,7 @@ async def import_selected_funds(portfolio_id: int, request: Request, db: Session
             fund_name = fund.get("name") or fund.get("fund_name") or ""
             
             # 构建symbol，使用代码和名称的组合
-            symbol = f"{fund_code} {fund_name}" if fund_code else fund_name
+            symbol = f"{fund_code}" if fund_code else fund_name
             
             # 获取持仓信息 - 适配不同的数据结构
             shares = float(fund.get("shares", 0))

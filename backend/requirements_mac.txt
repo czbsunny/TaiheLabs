@@ -41,3 +41,6 @@ opencv-python==4.10.0.84
 uvicorn==0.35.0
 
 python-multipart==0.0.20
+
+# 基金数据源
+akshare==1.17.43
