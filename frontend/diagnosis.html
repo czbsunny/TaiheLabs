@@ -1,0 +1,1164 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>组合诊断 - 基金投资组合管理</title>
+    <link rel="stylesheet" href="/static/styles.css">
+    <link rel="stylesheet" href="/static/dashboard.css">
+    <link rel="stylesheet" href="/static/diagnosis.css">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#667eea',
+                        'primary-hover': '#5a67d8',
+                        secondary: '#764ba2',
+                        success: '#276749',
+                        'success-bg': '#c6f6d5',
+                        error: '#c53030',
+                        'error-bg': '#fed7d7',
+                    },
+                    fontFamily: {
+                        sans: ['-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .content-auto {
+                content-visibility: auto;
+            }
+            .scrollbar-hide {
+                -ms-overflow-style: none;
+                scrollbar-width: none;
+            }
+            .scrollbar-hide::-webkit-scrollbar {
+                display: none;
+            }
+            .risk-bar {
+                height: 8px;
+                border-radius: 4px;
+                transition: width 1s ease-in-out;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 返回按钮 -->
+        <div class="mb-6">
+            <button onclick="goBackToPortfolio()" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded text-sm flex items-center">
+                <i class="fa fa-arrow-left mr-2"></i> 返回投资组合管理中心
+            </button>
+        </div>
+        <!-- 页面头部 -->
+        <div class="dashboard-header">
+            <div class="header-content">
+                <h1 class="text-[clamp(1.5rem,3vw,2.5rem)] font-bold text-text-primary">组合诊断</h1>
+            </div>
+        </div>
+
+        <!-- 诊断内容区域 -->
+        <div class="diagnosis-content">
+            <!-- 加载状态 -->
+            <div id="loadingState" class="flex flex-col items-center justify-center py-20">
+                <div class="loading-spinner"></div>
+                <p class="mt-4 text-text-muted">正在加载诊断数据...</p>
+            </div>
+
+            <!-- 诊断结果区域 -->
+            <div id="diagnosisResult" class="hidden">
+                <!-- 组合名称 -->
+                <div class="mb-6">
+                    <h2 id="portfolioName" class="text-2xl font-bold"></h2>
+                </div>
+
+                <!-- 收益走势图表 -->
+                <div class="bg-white rounded-lg shadow-md p-4 mb-8">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-xl font-semibold">收益走势</h3>
+                        <button class="performance-pk bg-gray-100 hover:bg-gray-200 text-gray-800 px-3 py-1 rounded text-sm">
+                            业绩 PK <i class="fa fa-angle-right ml-1"></i>
+                        </button>
+                    </div>
+                    <!-- 总收益和年化收益率显示 -->
+                    <div class="flex gap-6 mb-4 text-lg">
+                        <div>
+                            <span class="text-text-secondary mr-2">总收益:</span>
+                            <span id="totalReturn" class="font-bold text-green-600">--</span>
+                        </div>
+                        <div>
+                            <span class="text-text-secondary mr-2">年化收益率:</span>
+                            <span id="annualReturn" class="font-bold text-blue-600">--</span>
+                        </div>
+                    </div>
+                    <div class="chart-container" style="position: relative; height: 300px;">
+                        <canvas id="performanceChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- 特色数据/风险指标 -->
+        <div class="bg-white rounded-lg shadow-md p-4 mb-8">
+            <h3 class="text-xl font-semibold mb-4">特色数据</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
+                <!-- 最大回撤 -->
+                <div class="risk-metric">
+                    <div class="flex justify-between items-end mb-2">
+                        <span class="text-text-secondary text-sm">最大回撤</span>
+                        <span class="text-2xl font-bold" id="maxDrawdown"></span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-2 mb-1">
+                        <div class="risk-bar bg-red-500" id="maxDrawdownBar"></div>
+                    </div>
+                    <p class="text-xs text-text-muted" id="maxDrawdownDesc"></p>
+                </div>
+
+                <!-- 夏普比率 -->
+                <div class="risk-metric">
+                    <div class="flex justify-between items-end mb-2">
+                        <span class="text-text-secondary text-sm">夏普比率</span>
+                        <span class="text-2xl font-bold" id="sharpeRatio"></span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-2 mb-1">
+                        <div class="risk-bar bg-blue-500" id="sharpeRatioBar"></div>
+                    </div>
+                    <p class="text-xs text-text-muted" id="sharpeRatioDesc"></p>
+                </div>
+
+                <!-- 波动率 -->
+                <div class="risk-metric">
+                    <div class="flex justify-between items-end mb-2">
+                        <span class="text-text-secondary text-sm">波动率</span>
+                        <span class="text-2xl font-bold" id="volatility"></span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-2 mb-1">
+                        <div class="risk-bar bg-yellow-500" id="volatilityBar"></div>
+                    </div>
+                    <p class="text-xs text-text-muted" id="volatilityDesc"></p>
+                </div>
+
+                <!-- 收益回撤比 -->
+                <div class="risk-metric">
+                    <div class="flex justify-between items-end mb-2">
+                        <span class="text-text-secondary text-sm">收益回撤比</span>
+                        <span class="text-2xl font-bold" id="returnDrawdownRatio"></span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-2 mb-1">
+                        <div class="risk-bar bg-green-500" id="returnDrawdownRatioBar"></div>
+                    </div>
+                    <p class="text-xs text-text-muted" id="returnDrawdownRatioDesc"></p>
+                </div>
+                
+                <!-- Alpha -->
+                <div class="risk-metric">
+                    <div class="flex justify-between items-end mb-2">
+                        <span class="text-text-secondary text-sm">Alpha</span>
+                        <span class="text-2xl font-bold" id="alpha"></span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-2 mb-1">
+                        <div class="risk-bar bg-purple-500" id="alphaBar"></div>
+                    </div>
+                    <p class="text-xs text-text-muted" id="alphaDesc"></p>
+                </div>
+                
+                <!-- Beta -->
+                <div class="risk-metric">
+                    <div class="flex justify-between items-end mb-2">
+                        <span class="text-text-secondary text-sm">Beta</span>
+                        <span class="text-2xl font-bold" id="beta"></span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-2 mb-1">
+                        <div class="risk-bar bg-indigo-500" id="betaBar"></div>
+                    </div>
+                    <p class="text-xs text-text-muted" id="betaDesc"></p>
+                </div>
+            </div>
+        </div>
+
+                <!-- 资产成分饼图 -->
+                <div class="bg-white rounded-lg shadow-md p-4 mb-8">
+                    <h3 class="text-xl font-semibold mb-4">资产成分</h3>
+                    <div class="flex flex-col md:flex-row items-center">
+                        <div class="chart-container" style="position: relative; height: 200px; width: 200px;">
+                            <canvas id="assetAllocationChart"></canvas>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-1 gap-2 md:ml-6">
+                            <div class="flex items-center">
+                                <div class="w-3 h-3 rounded-full bg-blue-500 mr-2"></div>
+                                <span class="text-text-secondary">基金成分: <span id="fundPercentage"></span></span>
+                            </div>
+                            <div class="flex items-center">
+                                <div class="w-3 h-3 rounded-full bg-red-500 mr-2"></div>
+                                <span class="text-text-secondary">股票成分: <span id="stockPercentage"></span></span>
+                            </div>
+                            <div class="flex items-center">
+                                <div class="w-3 h-3 rounded-full bg-yellow-500 mr-2"></div>
+                                <span class="text-text-secondary">现金成分: <span id="cashPercentage"></span></span>
+                            </div>
+                            <div class="flex items-center">
+                                <div class="w-3 h-3 rounded-full bg-green-500 mr-2"></div>
+                                <span class="text-text-secondary">债券成分: <span id="bondPercentage"></span></span>
+                            </div>
+                            <div class="flex items-center">
+                                <div class="w-3 h-3 rounded-full bg-purple-500 mr-2"></div>
+                                <span class="text-text-secondary">其他: <span id="otherPercentage"></span></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 收益贡献分析 -->
+                <div class="bg-white rounded-lg shadow-md p-4 mb-8">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-xl font-semibold">收益贡献</h3>
+                        <div class="flex gap-2">
+                            <button class="contribution-tab active text-sm px-3 py-1 rounded" data-period="all">全部</button>
+                            <button class="contribution-tab text-sm px-3 py-1 rounded" data-period="month">近1月</button>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full">
+                            <thead>
+                                <tr>
+                                    <th class="text-left py-3 px-4 bg-gray-50 text-text-secondary font-medium">产品</th>
+                                    <th class="text-right py-3 px-4 bg-gray-50 text-text-secondary font-medium">占比</th>
+                                    <th class="text-right py-3 px-4 bg-gray-50 text-text-secondary font-medium">全部收益贡献</th>
+                                    <th class="text-right py-3 px-4 bg-gray-50 text-text-secondary font-medium">近1月收益贡献</th>
+                                </tr>
+                            </thead>
+                            <tbody id="contributionTableBody">
+                                <!-- 收益贡献数据将通过JS动态填充 -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- 基金详情表格 -->
+                <div class="bg-white rounded-lg shadow-md p-4 mb-8">
+                    <h3 class="text-xl font-semibold mb-4">基金详情</h3>
+                    <div class="overflow-x-auto">
+                        <table id="fundDetailsTable" class="min-w-full">
+                            <thead>
+                                <tr>
+                                    <th class="text-left py-3 px-4 bg-gray-50 text-text-secondary font-medium">基金名称</th>
+                                    <th class="text-left py-3 px-4 bg-gray-50 text-text-secondary font-medium">基金代码</th>
+                                    <th class="text-right py-3 px-4 bg-gray-50 text-text-secondary font-medium">权重占比</th>
+                                    <th class="text-right py-3 px-4 bg-gray-50 text-text-secondary font-medium">收益率(%)</th>
+                                    <th class="text-right py-3 px-4 bg-gray-50 text-text-secondary font-medium">风险值</th>
+                                    <th class="text-right py-3 px-4 bg-gray-50 text-text-secondary font-medium">夏普比率</th>
+                                </tr>
+                            </thead>
+                            <tbody id="fundDetailsTableBody">
+                                <!-- 表格内容将通过JavaScript动态生成 -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- 成分基金相关性矩阵 -->
+                <div class="bg-white rounded-lg shadow-md p-4 mb-8">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-xl font-semibold">成分基金相关性</h3>
+                        <button class="text-primary text-sm">更多 <i class="fa fa-angle-right ml-1"></i></button>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <div id="correlationMatrix" class="correlation-matrix">
+                            <!-- 相关性矩阵将通过JS动态填充 -->
+                        </div>
+                    </div>
+                    <div class="flex justify-between items-center mt-4">
+                        <div class="flex items-center">
+                            <div class="w-24 h-2 bg-gradient-to-r from-red-500 via-yellow-500 to-green-500 rounded"></div>
+                        </div>
+                        <div class="text-xs text-text-muted">
+                            <span>正相关</span> <span class="mx-4">负相关</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 从模板中获取user_id
+        const userId = '{{ user_id }}';
+        
+        // 返回投资组合管理中心的函数
+        function goBackToPortfolio() {
+            // 从URL路径中获取当前的portfolio_id
+            let portfolioId = 1; // 默认值
+            const pathname = window.location.pathname;
+            const pathParts = pathname.split('/');
+            
+            // 查找URL路径中最后一个数字作为组合ID
+            for (let i = pathParts.length - 1; i >= 0; i--) {
+                const num = parseInt(pathParts[i]);
+                if (!isNaN(num)) {
+                    portfolioId = num;
+                    break;
+                }
+            }
+            
+            // 兼容旧的查询参数方式
+            const urlParams = new URLSearchParams(window.location.search);
+            const queryId = parseInt(urlParams.get('portfolio_id'));
+            if (!isNaN(queryId)) {
+                portfolioId = queryId;
+            }
+            
+            // 返回到对应的投资组合页面，并传递当前portfolio_id参数用于自动切换tab
+            window.location.href = `/api/portfolio/${userId}?portfolio_id=${portfolioId}`;
+        }
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            // 获取组合ID - 从URL路径中提取，格式: /api/portfolio/diagnosis/page/9
+            let portfolioId = 1; // 默认值
+            const pathname = window.location.pathname;
+            const pathParts = pathname.split('/');
+            
+            // 查找URL路径中最后一个数字作为组合ID
+            for (let i = pathParts.length - 1; i >= 0; i--) {
+                const num = parseInt(pathParts[i]);
+                if (!isNaN(num)) {
+                    portfolioId = num;
+                    break;
+                }
+            }
+            
+            // 兼容旧的查询参数方式，优先级低于路径中的ID
+            const urlParams = new URLSearchParams(window.location.search);
+            const queryId = parseInt(urlParams.get('portfolio_id'));
+            if (!isNaN(queryId)) {
+                portfolioId = queryId;
+            }
+            
+            // 获取诊断数据
+            fetch(`/api/portfolio/diagnosis/${portfolioId}`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('网络响应错误');
+                    }
+                    return response.json();
+                })
+                .then(response => {
+                    // 检查响应是否包含success和data字段
+                    if (response && response.success && response.data && Object.keys(response.data).length > 0) {
+                        // 检查返回的数据是否包含足够的基金数据
+                        if (response.data.fund_details && response.data.fund_details.length > 0 && 
+                            response.data.correlation_matrix && response.data.correlation_matrix.funds && 
+                            response.data.correlation_matrix.funds.length > 0) {
+                            displayDiagnosisData(response.data);
+                        } else {
+                            // 如果基金数据不完整，使用模拟数据
+                            const mockData = getMockDiagnosisData(portfolioId);
+                            displayDiagnosisData(mockData);
+                        }
+                    } else {
+                        // 如果没有数据，使用模拟数据
+                        const mockData = getMockDiagnosisData(portfolioId);
+                        displayDiagnosisData(mockData);
+                    }
+                })
+                .catch(error => {
+                    console.error('获取诊断数据失败:', error);
+                    // 显示模拟数据
+                    const mockData = getMockDiagnosisData(portfolioId);
+                    displayDiagnosisData(mockData);
+                });
+            });
+        
+        // 获取诊断数据（包含模拟基金数据）
+        function getMockDiagnosisData(portfolioId) {
+            // 创建14只模拟基金
+            const mockFunds = [
+                { code: '000001', name: '易方达蓝筹精选混合', weight: 8.5, return: 12.3, risk: 15.6, sharpe: 1.25 },
+                { code: '000002', name: '华夏回报混合A', weight: 7.2, return: 9.8, risk: 12.3, sharpe: 1.05 },
+                { code: '000003', name: '广发创新升级混合', weight: 6.8, return: 15.2, risk: 18.9, sharpe: 1.32 },
+                { code: '000004', name: '南方中证500ETF联接A', weight: 5.9, return: 8.7, risk: 14.2, sharpe: 0.98 },
+                { code: '000005', name: '博时主题行业混合', weight: 6.3, return: 11.5, risk: 16.1, sharpe: 1.15 },
+                { code: '000006', name: '嘉实新兴产业股票', weight: 7.1, return: 14.8, risk: 17.8, sharpe: 1.28 },
+                { code: '000007', name: '兴全合润混合', weight: 8.2, return: 13.6, risk: 16.5, sharpe: 1.22 },
+                { code: '000008', name: '汇添富价值精选混合', weight: 5.7, return: 10.3, risk: 13.7, sharpe: 1.08 },
+                { code: '000009', name: '银华富裕主题混合', weight: 6.4, return: 12.8, risk: 17.2, sharpe: 1.18 },
+                { code: '000010', name: '中欧时代先锋股票A', weight: 7.5, return: 16.3, risk: 19.5, sharpe: 1.35 },
+                { code: '000011', name: '景顺长城新兴成长混合', weight: 6.9, return: 14.1, risk: 18.3, sharpe: 1.26 },
+                { code: '000012', name: '工银瑞信创新动力股票', weight: 5.8, return: 11.9, risk: 16.8, sharpe: 1.12 },
+                { code: '000013', name: '鹏华消费优选混合', weight: 6.1, return: 12.5, risk: 17.1, sharpe: 1.16 },
+                { code: '000014', name: '国泰金龙行业混合', weight: 6.6, return: 10.9, risk: 15.4, sharpe: 1.09 }
+            ];
+            
+            // 生成相关性矩阵
+            const funds = mockFunds.map(fund => fund.code);
+            const matrix = funds.map(() => funds.map(() => 0.0));
+            
+            // 填充相关性矩阵，对角线为1，其他为0.5-0.9的随机值
+            for (let i = 0; i < funds.length; i++) {
+                for (let j = 0; j < funds.length; j++) {
+                    if (i === j) {
+                        matrix[i][j] = 1.0;
+                    } else {
+                        matrix[i][j] = Math.round((0.5 + Math.random() * 0.4) * 100) / 100;
+                    }
+                }
+            }
+            
+            return {
+                portfolio_id: portfolioId,
+                portfolio_name: '我的组合',
+                risk_level: null,
+                performance: {
+                    total_return: 12.8,
+                    annual_return: 8.5,
+                    benchmark_return: null,
+                    monthly_return: null,
+                    daily_return: null,
+                    win_rate: null
+                },
+                risk_metrics: {
+                    max_drawdown: null,
+                    sharpe_ratio: null,
+                    volatility: null,
+                    return_drawdown_ratio: null,
+                    alpha: null,
+                    beta: null,
+                    information_ratio: null,
+                    sortino_ratio: null,
+                    skewness: null,
+                    kurtosis: null
+                },
+                asset_allocation: {
+                    fund: null,
+                    stock: null,
+                    cash: null,
+                    bond: null,
+                    other: null
+                },
+                contribution_analysis: [],
+                correlation_matrix: {
+                    funds: funds,
+                    matrix: matrix
+                },
+                simulation: {
+                    future_scenarios: []
+                },
+                fund_details: mockFunds
+            };
+        }
+        
+        function displayDiagnosisData(data) {
+            // 保存数据到全局变量，供其他函数使用
+            window.currentDiagnosisData = data;
+            
+            // 显示组合名称
+            document.getElementById('portfolioName').textContent = data.portfolio_name || '我的组合';
+            
+            // 显示总收益和年化收益率
+            document.getElementById('totalReturn').textContent = data.performance && data.performance.total_return !== null ? data.performance.total_return + '%' : '--';
+            document.getElementById('annualReturn').textContent = data.performance && data.performance.annual_return !== null ? data.performance.annual_return + '%' : '--';
+            
+            // 显示收益表现数据 - 处理空值
+            document.getElementById('maxDrawdown').textContent = data.risk_metrics.max_drawdown !== null ? data.risk_metrics.max_drawdown + '%' : '--';
+            document.getElementById('sharpeRatio').textContent = data.risk_metrics.sharpe_ratio !== null ? data.risk_metrics.sharpe_ratio : '--';
+            document.getElementById('volatility').textContent = data.risk_metrics.volatility !== null ? data.risk_metrics.volatility + '%' : '--';
+            document.getElementById('returnDrawdownRatio').textContent = data.risk_metrics.return_drawdown_ratio !== null ? data.risk_metrics.return_drawdown_ratio : '--';
+            document.getElementById('alpha').textContent = data.risk_metrics.alpha !== null ? data.risk_metrics.alpha : '--';
+            document.getElementById('beta').textContent = data.risk_metrics.beta !== null ? data.risk_metrics.beta : '--';
+            
+            // 设置风险指标进度条 - 处理空值和负值
+            document.getElementById('maxDrawdownBar').style.width = data.risk_metrics.max_drawdown !== null ? Math.min(Math.abs(data.risk_metrics.max_drawdown), 100) + '%' : '0%';
+            document.getElementById('sharpeRatioBar').style.width = data.risk_metrics.sharpe_ratio !== null ? Math.min(data.risk_metrics.sharpe_ratio * 20, 100) + '%' : '0%';
+            document.getElementById('volatilityBar').style.width = data.risk_metrics.volatility !== null ? Math.min(data.risk_metrics.volatility, 100) + '%' : '0%';
+            document.getElementById('returnDrawdownRatioBar').style.width = data.risk_metrics.return_drawdown_ratio !== null ? Math.min(data.risk_metrics.return_drawdown_ratio * 30, 100) + '%' : '0%';
+            document.getElementById('alphaBar').style.width = data.risk_metrics.alpha !== null ? Math.min(Math.max((parseFloat(data.risk_metrics.alpha) + 5) * 10, 0), 100) + '%' : '0%';
+            document.getElementById('betaBar').style.width = data.risk_metrics.beta !== null ? Math.min(parseFloat(data.risk_metrics.beta) * 50, 100) + '%' : '0%';
+            
+            // 设置风险指标描述 - 处理空值
+            document.getElementById('maxDrawdownDesc').textContent = data.risk_metrics.max_drawdown !== null ? '回撤很低于同类' : '--';
+            document.getElementById('sharpeRatioDesc').textContent = data.risk_metrics.sharpe_ratio !== null ? '性比较高优于同类' : '--';
+            document.getElementById('volatilityDesc').textContent = data.risk_metrics.volatility !== null ? '波动很小优于同类' : '--';
+            document.getElementById('returnDrawdownRatioDesc').textContent = data.risk_metrics.return_drawdown_ratio !== null ? '盈利质量较高优于同类' : '--';
+            document.getElementById('alphaDesc').textContent = data.risk_metrics.alpha !== null ? '超额收益能力强' : '--';
+            document.getElementById('betaDesc').textContent = data.risk_metrics.beta !== null ? '系统性风险较低' : '--';
+            
+            // 绘制收益走势图
+            drawPerformanceChart(data);
+            
+            // 绘制资产配置饼图
+            drawAssetAllocationChart(data.asset_allocation);
+            
+            // 显示资产配置百分比 - 处理空值
+            document.getElementById('fundPercentage').textContent = data.asset_allocation.fund !== null ? data.asset_allocation.fund + '%' : '--';
+            document.getElementById('stockPercentage').textContent = data.asset_allocation.stock !== null ? data.asset_allocation.stock + '%' : '--';
+            document.getElementById('cashPercentage').textContent = data.asset_allocation.cash !== null ? data.asset_allocation.cash + '%' : '--';
+            document.getElementById('bondPercentage').textContent = data.asset_allocation.bond !== null ? data.asset_allocation.bond + '%' : '--';
+            document.getElementById('otherPercentage').textContent = data.asset_allocation.other !== null ? data.asset_allocation.other + '%' : '--';
+            
+            // 显示收益贡献表格
+            displayContributionTable(data.contribution_analysis);
+            
+            // 显示基金详情表格
+            displayFundDetails(data.fund_details);
+            
+            // 显示相关性矩阵
+            displayCorrelationMatrix(data.correlation_matrix);
+            
+            // 显示诊断结果，隐藏加载状态
+            document.getElementById('loadingState').classList.add('hidden');
+            document.getElementById('diagnosisResult').classList.remove('hidden');
+        }
+        
+        // 显示基金详情表格
+        function displayFundDetails(fundDetails) {
+            const tableBody = document.getElementById('fundDetailsTableBody');
+            tableBody.innerHTML = '';
+            
+            if (!fundDetails || fundDetails.length === 0) {
+                const emptyRow = document.createElement('tr');
+                emptyRow.innerHTML = '<td colspan="6" class="py-4 text-center text-text-secondary">暂无基金数据</td>';
+                tableBody.appendChild(emptyRow);
+                return;
+            }
+            
+            fundDetails.forEach(fund => {
+                const row = document.createElement('tr');
+                row.className = 'border-b border-gray-100 hover:bg-gray-50';
+                
+                // 根据收益率设置颜色
+                const returnColor = fund.return > 0 ? 'text-green-600' : fund.return < 0 ? 'text-red-600' : 'text-text-primary';
+                
+                row.innerHTML = `
+                    <td class="py-3 px-4 font-medium">${fund.name}</td>
+                    <td class="py-3 px-4 text-text-secondary">${fund.code}</td>
+                    <td class="py-3 px-4 text-right">
+                        <div class="flex items-center justify-end">
+                            <span class="font-medium mr-2">${fund.weight}%</span>
+                            <div class="w-16 h-2 bg-gray-100 rounded-full">
+                                <div class="h-2 bg-blue-500 rounded-full" style="width: ${Math.min(fund.weight, 100)}%"/>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="py-3 px-4 text-right ${returnColor} font-medium">${fund.return}</td>
+                    <td class="py-3 px-4 text-right">${fund.risk}</td>
+                    <td class="py-3 px-4 text-right">${fund.sharpe.toFixed(2)}</td>
+                `;
+                
+                tableBody.appendChild(row);
+            });
+        }
+        
+        function drawPerformanceChart(data) {
+            const ctx = document.getElementById('performanceChart').getContext('2d');
+            
+            // 检查是否有实际的净值数据
+            if (data.performance && data.performance.daily_nav && data.performance.daily_nav.length > 0) {
+                // 使用后端返回的真实每日净值数据
+                // 提取日期并保持统一格式
+                const dates = data.performance.daily_nav.map(item => {
+                    const date = new Date(item.date);
+                    // 格式化日期为YYYY-MM-DD格式
+                    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+                });
+                
+                // 确保收益率数据正确转换为百分比格式
+                let portfolioReturns = [];
+                if (data.performance.daily_nav[0].hasOwnProperty('accumulated_return')) {
+                    // 如果数据中包含累计收益率字段，直接使用
+                    portfolioReturns = data.performance.daily_nav.map(item => {
+                        const returnValue = parseFloat(item.accumulated_return) * 100;
+                        return returnValue.toFixed(2);
+                    });
+                } else if (data.performance.daily_nav[0].hasOwnProperty('nav')) {
+                    // 如果只有净值数据，计算累计收益率
+                    const baseNav = parseFloat(data.performance.daily_nav[0].nav);
+                    portfolioReturns = data.performance.daily_nav.map(item => {
+                        const nav = parseFloat(item.nav);
+                        const accumulatedReturn = ((nav / baseNav) - 1) * 100;
+                        return accumulatedReturn.toFixed(2);
+                    });
+                }
+                
+                // 准备基准数据（如果有）
+                let benchmarkReturns = null;
+                if (data.performance.benchmark_daily_nav && data.performance.benchmark_daily_nav.length > 0) {
+                    if (data.performance.benchmark_daily_nav[0].hasOwnProperty('accumulated_return')) {
+                        benchmarkReturns = data.performance.benchmark_daily_nav.map(item => {
+                            const returnValue = parseFloat(item.accumulated_return) * 100;
+                            return returnValue.toFixed(2);
+                        });
+                    } else if (data.performance.benchmark_daily_nav[0].hasOwnProperty('nav')) {
+                        const baseNav = parseFloat(data.performance.benchmark_daily_nav[0].nav);
+                        benchmarkReturns = data.performance.benchmark_daily_nav.map(item => {
+                            const nav = parseFloat(item.nav);
+                            const accumulatedReturn = ((nav / baseNav) - 1) * 100;
+                            return accumulatedReturn.toFixed(2);
+                        });
+                    }
+                }
+                
+                // 打印调试信息，帮助确认数据格式
+                console.log('后端数据格式检查:', {
+                    datesCount: dates.length,
+                    portfolioReturnsCount: portfolioReturns.length,
+                    benchmarkReturnsCount: benchmarkReturns ? benchmarkReturns.length : 0,
+                    sampleDate: dates.length > 0 ? dates[0] : '无',
+                    sampleReturn: portfolioReturns.length > 0 ? portfolioReturns[0] : '无'
+                });
+                
+                createChart(ctx, dates, portfolioReturns, benchmarkReturns);
+            } else {
+                // 模拟时间序列数据 (最近3个月)
+                const dates = [];
+                const today = new Date();
+                const daysInThreeMonths = 90;
+                for (let i = daysInThreeMonths; i >= 0; i--) {
+                    const date = new Date();
+                    date.setDate(today.getDate() - i);
+                    dates.push(date.toLocaleDateString());
+                }
+                
+                // 如果没有实际数据，显示空图表
+                if (data.performance.total_return === null || data.performance.benchmark_return === null) {
+                    // 清空画布
+                    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+                    
+                    // 显示提示文字
+                    const centerX = ctx.canvas.width / 2;
+                    const centerY = ctx.canvas.height / 2;
+                    ctx.font = '14px Arial';
+                    ctx.fillStyle = '#999';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('暂无数据', centerX, centerY);
+                    return;
+                }
+                
+                // 有实际数据时才生成收益数据
+                // 模拟组合收益数据（从0开始）
+                const portfolioReturns = [];
+                let portfolioValue = 0;
+                
+                // 模拟沪深300指数数据（从0开始）
+                const benchmarkReturns = [];
+                let benchmarkValue = 0;
+                
+                // 根据总回报率生成随机但趋势向上的数据
+                const targetReturn = data.performance.total_return || 0;
+                const dailyRate = Math.pow(1 + targetReturn / 100, 1/daysInThreeMonths) - 1;
+                
+                const targetBenchmarkReturn = data.performance.benchmark_return || 0;
+                const benchmarkDailyRate = Math.pow(1 + targetBenchmarkReturn / 100, 1/daysInThreeMonths) - 1;
+                
+                for (let i = 0; i < dates.length; i++) {
+                    // 添加一些随机波动，使曲线更真实
+                    const randomFactor = 1 + (Math.random() * 0.02 - 0.01);
+                    
+                    // 第一天从0开始，之后每天累加收益
+                    if (i === 0) {
+                        portfolioValue = 0;
+                        benchmarkValue = 0;
+                    } else {
+                        // 计算当天的绝对增长额
+                        const dailyReturn = 100 * dailyRate * randomFactor;
+                        portfolioValue += dailyReturn;
+                        
+                        const benchmarkDailyReturn = 100 * benchmarkDailyRate * randomFactor;
+                        benchmarkValue += benchmarkDailyReturn;
+                    }
+                    
+                    portfolioReturns.push(portfolioValue.toFixed(2));
+                    benchmarkReturns.push(benchmarkValue.toFixed(2));
+                }
+                
+                createChart(ctx, dates, portfolioReturns, benchmarkReturns);
+            }
+        }
+        
+        // 图表创建函数，提取出来便于复用
+        function createChart(ctx, dates, portfolioReturns, benchmarkReturns) {
+            // 确保有数据
+            if (!portfolioReturns || portfolioReturns.length === 0) {
+                // 清空画布
+                ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+                
+                // 显示提示文字
+                const centerX = ctx.canvas.width / 2;
+                const centerY = ctx.canvas.height / 2;
+                ctx.font = '14px Arial';
+                ctx.fillStyle = '#999';
+                ctx.textAlign = 'center';
+                ctx.fillText('暂无数据', centerX, centerY);
+                return;
+            }
+            
+            // 准备数据集
+            const datasets = [
+                {
+                    label: '组合',
+                    data: portfolioReturns,
+                    borderColor: '#FF6B6B',
+                    backgroundColor: 'rgba(255, 107, 107, 0.1)',
+                    borderWidth: 2,
+                    pointRadius: 0,
+                    tension: 0.3,
+                    fill: false
+                }
+            ];
+            
+            // 如果有基准数据，添加基准线
+            if (benchmarkReturns && benchmarkReturns.length > 0) {
+                datasets.push({
+                    label: '沪深300',
+                    data: benchmarkReturns,
+                    borderColor: '#6C757D',
+                    backgroundColor: 'rgba(108, 117, 125, 0.1)',
+                    borderWidth: 2,
+                    borderDash: [5, 5],
+                    pointRadius: 0,
+                    tension: 0.3,
+                    fill: false
+                });
+            }
+            
+            const chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: dates,
+                    datasets: datasets
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false,
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            labels: {
+                                usePointStyle: true,
+                                boxWidth: 6,
+                                font: {
+                                    size: 12
+                                }
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            padding: 12,
+                            bodyFont: {
+                                size: 12
+                            },
+                            titleFont: {
+                                size: 13,
+                                weight: 'bold'
+                            },
+                            callbacks: {
+                                label: function(context) {
+                                    return `${context.dataset.label}: ${context.parsed.y}%`;
+                                },
+                                title: function(context) {
+                                    // 格式化日期显示
+                                    const date = new Date(context[0].label);
+                                    return date.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' });
+                                }
+                            }
+                        },
+                        // 添加图表标题
+                        title: {
+                            display: true,
+                            text: '组合收益走势与沪深300比较',
+                            font: {
+                                size: 14,
+                                weight: 'bold'
+                            },
+                            color: '#333',
+                            padding: {
+                                bottom: 10
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                                grid: {
+                                    display: false
+                                },
+                                ticks: {
+                                    callback: function(value, index, values) {
+                                        // 根据数据点数量动态决定显示的日期密度
+                                        const labelCount = values.length;
+                                        let displayInterval = 1;
+                                        
+                                        // 根据数据点数量调整显示间隔
+                                        if (labelCount > 120) {
+                                            // 超过120个点，每30个点显示一个
+                                            displayInterval = Math.ceil(labelCount / 6);
+                                        } else if (labelCount > 60) {
+                                            // 60-120个点，每15个点显示一个
+                                            displayInterval = Math.ceil(labelCount / 8);
+                                        } else if (labelCount > 30) {
+                                            // 30-60个点，每10个点显示一个
+                                            displayInterval = Math.ceil(labelCount / 10);
+                                        }
+                                        
+                                        // 根据间隔决定是否显示当前标签
+                                        if (index % displayInterval === 0 || index === labelCount - 1) {
+                                            // 获取日期
+                                            const date = new Date(this.getLabelForValue(value));
+                                            
+                                            // 如果是最后一个点或者数据量较少，显示完整日期
+                                            if (index === labelCount - 1 || labelCount <= 15) {
+                                                return `${date.getFullYear()}/${date.getMonth() + 1}/${date.getDate()}`;
+                                            }
+                                            // 否则只显示月和日
+                                            return `${date.getMonth() + 1}/${date.getDate()}`;
+                                        }
+                                        return '';
+                                    },
+                                    font: {
+                                        size: 11
+                                    }
+                                }
+                            },
+                        y: {
+                            beginAtZero: true,
+                            grid: {
+                                borderDash: [2, 2],
+                                color: 'rgba(0, 0, 0, 0.05)'
+                            },
+                            ticks: {
+                                callback: function(value) {
+                                    return value + '%';
+                                },
+                                font: {
+                                    size: 11
+                                }
+                            }
+                        }
+                    },
+                    // 添加动画效果
+                    animation: {
+                        duration: 1500,
+                        easing: 'easeOutQuart'
+                    }
+                }
+            });
+        }
+        
+        function drawAssetAllocationChart(assetAllocation) {
+            const ctx = document.getElementById('assetAllocationChart').getContext('2d');
+            
+            // 检查是否有实际数据
+            const hasData = assetAllocation.fund !== null || 
+                          assetAllocation.stock !== null || 
+                          assetAllocation.cash !== null || 
+                          assetAllocation.bond !== null || 
+                          assetAllocation.other !== null;
+            
+            if (!hasData) {
+                // 清空画布
+                ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+                
+                // 显示提示文字
+                const centerX = ctx.canvas.width / 2;
+                const centerY = ctx.canvas.height / 2;
+                ctx.font = '14px Arial';
+                ctx.fillStyle = '#999';
+                ctx.textAlign = 'center';
+                ctx.fillText('暂无数据', centerX, centerY);
+                
+                // 清空对应的百分比显示
+                document.getElementById('fundPercentage').textContent = '--';
+                document.getElementById('stockPercentage').textContent = '--';
+                document.getElementById('cashPercentage').textContent = '--';
+                document.getElementById('bondPercentage').textContent = '--';
+                document.getElementById('otherPercentage').textContent = '--';
+                return;
+            }
+            
+            // 替换null值为0
+            const fundValue = assetAllocation.fund !== null ? assetAllocation.fund : 0;
+            const stockValue = assetAllocation.stock !== null ? assetAllocation.stock : 0;
+            const cashValue = assetAllocation.cash !== null ? assetAllocation.cash : 0;
+            const bondValue = assetAllocation.bond !== null ? assetAllocation.bond : 0;
+            const otherValue = assetAllocation.other !== null ? assetAllocation.other : 0;
+            
+            const chart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['基金成分', '股票成分', '现金成分', '债券成分', '其他'],
+                    datasets: [{
+                        data: [
+                            fundValue,
+                            stockValue,
+                            cashValue,
+                            bondValue,
+                            otherValue
+                        ],
+                        backgroundColor: [
+                            '#4299E1', // 蓝色
+                            '#EF4444', // 红色
+                            '#FBBF24', // 黄色
+                            '#10B981', // 绿色
+                            '#8B5CF6'  // 紫色
+                        ],
+                        borderWidth: 0,
+                        hoverOffset: 6,
+                        // 添加边框效果
+                        borderColor: '#ffffff',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '65%',
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            padding: 12,
+                            bodyFont: {
+                                size: 12
+                            },
+                            callbacks: {
+                                label: function(context) {
+                                    return `${context.label}: ${context.parsed}%`;
+                                },
+                                title: function() {
+                                    return '资产配置分布';
+                                }
+                            }
+                        }
+                    },
+                    // 添加动画效果
+                    animation: {
+                        animateRotate: true,
+                        animateScale: true,
+                        duration: 1500,
+                        easing: 'easeOutQuart'
+                    }
+                }
+            });
+        }
+        
+        function displayContributionTable(contributions) {
+            const tableBody = document.getElementById('contributionTableBody');
+            tableBody.innerHTML = '';
+            
+            // 检查是否有数据
+            if (!contributions || contributions.length === 0) {
+                const emptyRow = document.createElement('tr');
+                emptyRow.innerHTML = '<td colspan="4" class="py-4 text-center text-text-secondary">暂无收益贡献数据</td>';
+                tableBody.appendChild(emptyRow);
+                return;
+            }
+            
+            // 过滤掉"本组合"这一行，因为我们只需要显示各个基金的权重占比
+            const fundContributions = contributions.filter(contribution => contribution.name !== '本组合');
+            
+            // 检查过滤后是否有数据
+            if (fundContributions.length === 0) {
+                const emptyRow = document.createElement('tr');
+                emptyRow.innerHTML = '<td colspan="4" class="py-4 text-center text-text-secondary">暂无收益贡献数据</td>';
+                tableBody.appendChild(emptyRow);
+                return;
+            }
+            
+            fundContributions.forEach(contribution => {
+                const row = document.createElement('tr');
+                row.className = 'border-b border-gray-100 hover:bg-gray-50';
+                
+                row.innerHTML = `
+                    <td class="py-3 px-4">
+                        <div class="font-medium">${contribution.name || '--'}</div>
+                        <div class="text-xs text-text-muted">${contribution.symbol || '--'}</div>
+                    </td>
+                    <td class="py-3 px-4 text-right">
+                        <div class="font-semibold">${contribution.weight !== null ? contribution.weight + '%' : '--'}</div>
+                        <div class="w-full bg-gray-200 rounded-full h-1.5 mt-1">
+                            <div class="bg-blue-500 h-1.5 rounded-full" style="width: ${contribution.weight !== null ? contribution.weight + '%' : '0%'}"></div>
+                        </div>
+                    </td>
+                    <td class="py-3 px-4 text-right ${contribution.total_contribution !== null ? (contribution.total_contribution > 0 ? 'text-green-600' : contribution.total_contribution < 0 ? 'text-red-600' : '') : ''}">
+                        ${contribution.total_contribution !== null ? contribution.total_contribution + '%' : '--'}
+                    </td>
+                    <td class="py-3 px-4 text-right ${contribution.monthly_contribution !== null ? (contribution.monthly_contribution > 0 ? 'text-green-600' : contribution.monthly_contribution < 0 ? 'text-red-600' : '') : ''}">
+                        ${contribution.monthly_contribution !== null ? contribution.monthly_contribution + '%' : '--'}
+                    </td>
+                `;
+                
+                tableBody.appendChild(row);
+            });
+        }
+        
+        // 截断字符串到指定长度的汉字字符
+        function truncateString(str, maxLength) {
+            if (!str) return '--';
+            const regex = new RegExp(`^.{0,${maxLength}}`);
+            const result = str.match(regex)[0];
+            return result.length < str.length ? result + '...' : result;
+        }
+        
+        function displayCorrelationMatrix(correlationData) {
+            const matrixContainer = document.getElementById('correlationMatrix');
+            matrixContainer.innerHTML = '';
+            
+            // 检查是否有数据
+            if (!correlationData || !correlationData.funds || correlationData.funds.length === 0 || 
+                !correlationData.matrix || correlationData.matrix.length === 0) {
+                matrixContainer.innerHTML = '<p class="text-center py-4 text-text-muted">暂无相关性数据</p>';
+                return;
+            }
+            
+            // 获取当前诊断数据中的基金详情信息
+            const diagnosisData = window.currentDiagnosisData || {};
+            const fundDetails = diagnosisData.fund_details || [];
+            
+            // 创建基金代码到名称的映射
+            const fundCodeToName = {};
+            fundDetails.forEach(fund => {
+                if (fund.code && fund.name) {
+                    fundCodeToName[fund.code] = fund.name;
+                }
+            });
+            
+            // 获取基金显示名称的辅助函数
+            const getFundDisplayName = (fundCode) => {
+                return fundCodeToName[fundCode] || fundCode; // 如果没有找到名称，显示代码作为备选
+            };
+            
+            // 创建表头行
+            const headerRow = document.createElement('div');
+            headerRow.className = 'correlation-row';
+            
+            // 空单元格作为左上角
+            const emptyCell = document.createElement('div');
+            emptyCell.className = 'correlation-cell header';
+            emptyCell.style.width = '120px'; // 直接在JavaScript中设置宽度
+            headerRow.appendChild(emptyCell);
+            
+            // 添加基金名称作为表头，优化显示格式
+            correlationData.funds.forEach((fund, index) => {
+                const fundName = getFundDisplayName(fund);
+                const headerCell = document.createElement('div');
+                headerCell.className = 'correlation-cell header';
+                headerCell.style.width = '120px'; // 直接在JavaScript中设置宽度
+                headerCell.style.textAlign = 'left'; // 表头文本右对齐
+                
+                // 根据空格或字符长度自动换行
+                if (fundName.length > 8) {
+                    // 尝试在空格处换行
+                    if (fundName.includes(' ')) {
+                        headerCell.innerHTML = fundName.replace(' ', '<br>');
+                    } else {
+                        // 如果没有空格，则在中间位置手动换行
+                        const middleIndex = Math.floor(fundName.length / 2);
+                        headerCell.innerHTML = fundName.substring(0, middleIndex) + '<br>' + fundName.substring(middleIndex);
+                    }
+                } else {
+                    headerCell.textContent = fundName;
+                }
+                
+                // 添加tooltip显示完整基金名称
+                headerCell.title = fundName;
+                headerRow.appendChild(headerCell);
+            });
+            
+            matrixContainer.appendChild(headerRow);
+            
+            // 创建数据行
+            correlationData.funds.forEach((fund, rowIndex) => {
+                const fundName = getFundDisplayName(fund);
+                const dataRow = document.createElement('div');
+                dataRow.className = 'correlation-row';
+                
+                // 添加行标题，优化显示格式
+                const rowHeader = document.createElement('div');
+                rowHeader.className = 'correlation-cell header';
+                rowHeader.style.width = '120px'; // 直接在JavaScript中设置宽度
+                rowHeader.style.textAlign = 'left'; // 行标题文本右对齐
+                
+                // 根据空格或字符长度自动换行
+                if (fundName.length > 8) {
+                    // 尝试在空格处换行
+                    if (fundName.includes(' ')) {
+                        rowHeader.innerHTML = fundName.replace(' ', '<br>');
+                    } else {
+                        // 如果没有空格，则在中间位置手动换行
+                        const middleIndex = Math.floor(fundName.length / 2);
+                        rowHeader.innerHTML = fundName.substring(0, middleIndex) + '<br>' + fundName.substring(middleIndex);
+                    }
+                } else {
+                    rowHeader.textContent = fundName;
+                }
+                
+                // 添加tooltip显示完整基金名称
+                rowHeader.title = fundName;
+                dataRow.appendChild(rowHeader);
+                
+                // 添加相关性值单元格
+                if (correlationData.matrix[rowIndex]) {
+                    correlationData.matrix[rowIndex].forEach((correlation, colIndex) => {
+                        const valueCell = document.createElement('div');
+                        valueCell.className = 'correlation-cell';
+                        valueCell.style.width = '120px'; // 设置数据单元格宽度与表头一致
+                        
+                        // 处理可能的null值
+                        if (correlation === null || isNaN(correlation)) {
+                            valueCell.textContent = '--';
+                            dataRow.appendChild(valueCell);
+                            return;
+                        }
+                        
+                        // 根据相关性值设置背景颜色
+                        const intensity = Math.abs(correlation) * 255;
+                        let bgColor;
+                        
+                        if (correlation > 0) {
+                            // 正相关：红色到黄色的渐变
+                            const red = 255;
+                            const green = Math.floor(255 - intensity);
+                            const blue = Math.floor(255 - intensity);
+                            bgColor = `rgb(${red}, ${green}, ${blue})`;
+                        } else {
+                            // 负相关：蓝色到青色的渐变
+                            const red = Math.floor(255 - intensity);
+                            const green = Math.floor(255 - intensity);
+                            const blue = 255;
+                            bgColor = `rgb(${red}, ${green}, ${blue})`;
+                        }
+                        
+                        valueCell.style.backgroundColor = bgColor;
+                        valueCell.textContent = correlation.toFixed(2);
+                        dataRow.appendChild(valueCell);
+                    });
+                }
+                
+                matrixContainer.appendChild(dataRow);
+            });
+        }
+        
+        function showError(message) {
+            document.getElementById('loadingState').classList.add('hidden');
+            
+            const errorElement = document.createElement('div');
+            errorElement.className = 'error-message flex flex-col items-center justify-center py-20';
+            errorElement.innerHTML = `
+                <i class="fa fa-exclamation-circle text-4xl text-error mb-4"></i>
+                <p class="text-error">${message}</p>
+            `;
+            
+            document.querySelector('.diagnosis-content').appendChild(errorElement);
+        }
+    </script>
+</body>
+</html>

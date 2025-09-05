@@ -1,0 +1,256 @@
+/* 诊断页面样式 */
+
+/* 诊断内容容器 */
+.diagnosis-content {
+    padding: 1.5rem;
+}
+
+/* 加载状态样式 */
+.loading-spinner {
+    width: 3rem;
+    height: 3rem;
+    border: 3px solid rgba(102, 126, 234, 0.1);
+    border-radius: 50%;
+    border-top-color: #667eea;
+    animation: spin 1s ease-in-out infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* 收益走势图表样式 */
+.performance-pk {
+    font-size: 0.875rem;
+    border-radius: 0.375rem;
+    transition: all 0.2s ease;
+}
+
+.performance-pk:hover {
+    background-color: #f3f4f6;
+}
+
+/* 风险指标卡片样式 */
+.risk-metric {
+    padding: 1rem;
+    background-color: #f9fafb;
+    border-radius: 0.5rem;
+    transition: transform 0.2s ease;
+}
+
+.risk-metric:hover {
+    transform: translateY(-2px);
+}
+
+/* 收益贡献表格样式 */
+.contribution-tab {
+    background-color: #f3f4f6;
+    color: #6b7280;
+    transition: all 0.2s ease;
+}
+
+.contribution-tab.active {
+    background-color: #667eea;
+    color: white;
+}
+
+.contribution-tab:hover:not(.active) {
+    background-color: #e5e7eb;
+}
+
+/* 相关性矩阵样式 */
+.correlation-matrix {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.375rem;
+    overflow: hidden;
+}
+
+/* 相关性矩阵容器，添加垂直滚动条支持 */
+#correlationMatrix {
+    max-height: 400px; /* 设置最大高度，当内容超过时显示滚动条 */
+    overflow-y: auto;
+    overflow-x: auto; /* 保留水平滚动条 */
+}
+
+/* 基金详情表格容器，添加垂直滚动条支持 */
+#fundDetailsTableBody {
+    display: block;
+    max-height: 400px; /* 设置最大高度，当内容超过时显示滚动条 */
+    overflow-y: auto;
+}
+
+#fundDetailsTable thead, #fundDetailsTable tbody tr {
+    display: table;
+    width: 100%;
+    table-layout: fixed;
+}
+
+.correlation-row {
+    display: flex;
+    flex-direction: row;
+}
+
+.correlation-cell {
+    width: 80px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #e5e7eb;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: #374151;
+}
+
+.correlation-cell.header {
+    background-color: #f9fafb;
+    font-weight: 600;
+    color: #6b7280;
+    width: 100px !important;
+    flex-shrink: 0;
+    white-space: normal;
+    text-align: center;
+    padding: 4px;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    .diagnosis-content {
+        padding: 1rem;
+    }
+    
+    .risk-metric {
+        margin-bottom: 1rem;
+    }
+    
+    .correlation-cell {
+        width: 60px;
+        height: 40px;
+        font-size: 0.625rem;
+    }
+    
+    .correlation-cell.header {
+        width: 100px !important;
+    }
+    
+    .chart-container {
+        height: 250px !important;
+    }
+}
+
+/* 错误消息样式 */
+.error-message {
+    text-align: center;
+    color: #c53030;
+}
+
+/* 特色数据卡片样式 */
+.feature-card {
+    background-color: white;
+    border-radius: 0.5rem;
+    padding: 1.5rem;
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+    transition: box-shadow 0.2s ease;
+}
+
+.feature-card:hover {
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+/* 滚动条样式 */
+.diagnosis-content {
+    scrollbar-width: thin;
+    scrollbar-color: #d1d5db #f3f4f6;
+}
+
+.diagnosis-content::-webkit-scrollbar {
+    width: 6px;
+}
+
+.diagnosis-content::-webkit-scrollbar-track {
+    background: #f3f4f6;
+}
+
+.diagnosis-content::-webkit-scrollbar-thumb {
+    background-color: #d1d5db;
+    border-radius: 20px;
+}
+
+/* 诊断结果标题样式 */
+#portfolioName {
+    color: #111827;
+    font-weight: 700;
+}
+
+/* 诊断指标动画效果 */
+.risk-bar {
+    transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* 表格样式增强 */
+#contributionTableBody tr:last-child {
+    border-bottom: none;
+}
+
+/* 图表容器样式 */
+.chart-container {
+    position: relative;
+    margin: auto;
+}
+
+/* 打印样式 */
+@media print {
+    .diagnosis-content {
+        padding: 0;
+    }
+    
+    .dashboard-header {
+        display: none;
+    }
+    
+    .feature-card {
+        box-shadow: none;
+        border: 1px solid #e5e7eb;
+        break-inside: avoid;
+        page-break-inside: avoid;
+    }
+}
+
+/* 暗色模式支持 */
+@media (prefers-color-scheme: dark) {
+    .risk-metric {
+        background-color: #1f2937;
+    }
+    
+    .contribution-tab {
+        background-color: #374151;
+        color: #9ca3af;
+    }
+    
+    .contribution-tab.active {
+        background-color: #667eea;
+        color: white;
+    }
+    
+    .contribution-tab:hover:not(.active) {
+        background-color: #4b5563;
+    }
+    
+    #portfolioName {
+        color: #f9fafb;
+    }
+    
+    .correlation-cell {
+        color: #f9fafb;
+        border-color: #374151;
+    }
+    
+    .correlation-cell.header {
+        background-color: #1f2937;
+        color: #9ca3af;
+        width: 100px !important;
+        flex-shrink: 0;
+    }
+}
